@@ -112,6 +112,13 @@
               <span class="result-count small text-secondary"><span id="totalFound">0</span> resultados</span>
             </div>
             <div class="d-flex align-items-center gap-2">
+              <!-- buscador en desktop -->
+              <form id="searchForm" class="d-none d-lg-block" style="min-width:260px;">
+                <div class="input-group">
+                  <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                  <input id="q" class="form-control" type="search" placeholder="Buscar…">
+                </div>
+              </form>
               <!-- buscador sólo en mobile -->
               <form id="searchFormTop" class="d-lg-none" style="min-width:220px;">
                 <div class="input-group">
@@ -439,6 +446,6 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
   <!-- Carga del inicializador principal (que ya importa y llama loadLayout) -->
-  <script type="module" src="/negocio/js/principal.js?v=4"></script>
+  <script type="module" src="/negocio/js/principal.js?v=5"></script>
 </body>
 </html>

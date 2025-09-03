@@ -2,7 +2,6 @@
 console.log('[principal] módulo cargado');
 
 import { state } from './modules/state.js';
-// import { $ } from './modules/utils.js'; // ← ya no se usa
 
 // -------------------------
 // Módulo de productos (admin)

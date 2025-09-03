@@ -66,19 +66,12 @@ export async function loadFiltroCategorias() {
   }
 }
 
-/* =========================================================
- * GALERÍA ACTIVA → state.productos (modo “imágenes como productos”)
- * =======================================================*/
 export async function loadGaleriaActiva() {
   const negocioId = state.negocio?.id;
   try {
     const reglas = buildVisibilityRules();
     const res = await fetch(`/api/negocios/${negocioId}/imagenes?estado=1`);
-    if (!res.ok) {
-      const text = await res.text().catch(() => '(sin body)');
-      console.error('[loadGaleriaActiva] HTTP', res.status, text);
-      throw new Error('No se pudo obtener la galería activa');
-    }
+    if (!res.ok) throw new Error('No se pudo obtener la galería activa');
 
     const data = await res.json();
     const arr = Array.isArray(data) ? data : [];
@@ -88,15 +81,14 @@ export async function loadGaleriaActiva() {
         const cats = Array.isArray(img.categorias) ? img.categorias : [];
         const enhanced = cats.map(c => ({
           ...c,
-          // Propagar rol si viene nulo, usando las reglas precargadas
           rol: c.rol ?? reglas.rolByCatId.get(Number(c.id)) ?? ''
         }));
         return { ...img, categorias: enhanced };
       })
       .filter(img => imagenCumpleReglas(img, reglas));
 
-    // Normalización compatible con marketplace
-    state.productos = visibles.map((img) => ({
+    // ⬇️ YA NO toques state.productos
+    const list = visibles.map((img) => ({
       id: img.id,
       imagen_id: img.id,
       producto_id: null,
@@ -112,16 +104,16 @@ export async function loadGaleriaActiva() {
       categorias: Array.isArray(img.categorias) ? img.categorias : [],
     }));
 
-    console.log('[loadGaleriaActiva] visibles:', state.productos.length, 'de', arr.length);
+    // Guárdalo separado para la UI de la galería/categorías
+    state.gallery.images = list;
+    return list;
   } catch (e) {
     console.error('[loadGaleriaActiva] error', e);
-    state.productos = [];
+    state.gallery.images = [];
+    return [];
   }
 }
 
-/* =========================================================
- * PRODUCTOS (BD) – LISTA / DETALLE / OPCIONES / PRECIO
- * =======================================================*/
 
 /**
  * Lista “clásica” de productos (para panel admin u otros usos).
@@ -169,8 +161,9 @@ export async function listProductos(params = {}) {
 /**
  * Feed del marketplace (recomendado para pintar el grid).
  * Devuelve { items, total, page, size } o { items: [] } si falla.
+ * (Interno; si lo necesitas fuera, expórtalo)
  */
-async function fetchMarketplaceFeed({ q = '', categoriaId = null, page = 1, size = 200 } = {}) {
+async function fetchMarketplaceFeed({ q = '', categoriaId = null, page = 1, size = 200, items = [] } = {}) {
   const negocioId = state.negocio?.id;
   if (!negocioId) return { items: [], total: 0, page, size };
 
@@ -179,6 +172,9 @@ async function fetchMarketplaceFeed({ q = '', categoriaId = null, page = 1, size
   if (categoriaId != null) usp.set('categoriaId', String(categoriaId));
   usp.set('page', String(page));
   usp.set('size', String(size));
+  (Array.isArray(items) ? items : [])
+    .map(Number).filter(Number.isFinite)
+    .forEach(id => usp.append('items', id));
 
   try {
     const r = await fetch(`/api/negocios/${negocioId}/marketplace?` + usp.toString());
@@ -297,30 +293,25 @@ function groupAttrs(op) {
 }
 
 /**
- * Carga productos activos desde BD y los deja en state.productos
- * con el formato que usa el marketplace (applyFilters/renderGrid/getAttrCats).
- * Prioriza el feed del marketplace; si falla, usa listProductos() y normaliza.
+ * Carga productos activos desde BD y devuelve el JSON del feed del marketplace.
+ * El que normaliza y pinta la UI es marketplace.js (refreshMarketplaceFromProductos).
  */
-export async function loadProductosActivos({ q = '', categoriaId = null, page = 1, size = 200 } = {}) {
-  const negocioId = state.negocio?.id;
-  if (!negocioId) { state.productos = []; return; }
+export async function loadProductosActivos({ q = '', categoriaId = null, page = 1, size = 200, items = [] } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (categoriaId) params.set('categoriaId', categoriaId);
+  params.set('page', page);
+  params.set('size', size);
 
-  try {
-    // 1) Intentar feed marketplace
-    const feed = await fetchMarketplaceFeed({ q, categoriaId, page, size });
-    let items  = coerceArr(feed.items);
+  (Array.isArray(items) ? items : [])
+    .map(Number)
+    .filter(Number.isFinite)
+    .forEach(id => params.append('items', id));
 
-    // 2) Fallback a lista clásica, si viene vacío
-    if (!items.length) {
-      const resp = await listProductos({ negocioId, q, categoriaId, page, size });
-      items = coerceArr(resp?.items);
-    }
-
-    state.productos = items.map(normalizeProducto);
-  } catch (e) {
-    console.error('[loadProductosActivos]', e);
-    state.productos = [];
-  }
+  const url = `/api/negocios/${state.negocio.id}/marketplace${params.toString() ? `?${params}` : ''}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('No se pudo cargar marketplace');
+  return await r.json(); // { total, page, size, items }
 }
 
 // (Opcional) detalle y opciones — útiles para modal/checkout/product-config

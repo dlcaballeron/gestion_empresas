@@ -251,6 +251,108 @@ router.get('/api/negocios/:negocioId/imagenes', async (req, res) => {
   }
 });
 
+/* ======================================================================
+ * GET /api/negocios/:negocioId/imagenes/:id
+ * Detalle de una imagen (incluye categorías/ítems agrupados)
+ * ====================================================================== */
+router.get('/api/negocios/:negocioId/imagenes/:id', async (req, res) => {
+  try {
+    const negocioId = toInt(req.params.negocioId);
+    const id = toInt(req.params.id);
+    if (!negocioId || !id) return res.status(400).json({});
+
+    await db.query('SET SESSION group_concat_max_len = 1000000');
+
+    const sql = `
+      SELECT
+        i.id, i.negocio_id, i.url, i.public_id, i.ancho, i.alto, i.formato, i.bytes,
+        i.estado, i.fecha_cargue, i.titulo, i.alt_text,
+
+        COALESCE(
+          CONCAT(
+            '[',
+            GROUP_CONCAT(DISTINCT
+              JSON_OBJECT(
+                'id', c.id,
+                'nombre', c.nombre,
+                'rol', c.rol
+              )
+            ),
+            ']'
+          ),
+          '[]'
+        ) AS categorias_json,
+
+        COALESCE(
+          CONCAT(
+            '[',
+            GROUP_CONCAT(DISTINCT
+              IF(c2.id IS NOT NULL,
+                JSON_OBJECT(
+                  'id', ci.id,
+                  'label', ci.label,
+                  'categoria_id', ci.categoria_id
+                ),
+                NULL
+              )
+            ),
+            ']'
+          ),
+          '[]'
+        ) AS items_json
+
+      FROM imagenes i
+      LEFT JOIN imagen_categoria ic ON ic.imagen_id = i.id
+      LEFT JOIN categorias c        ON c.id = ic.categoria_id AND c.estado = 1
+
+      LEFT JOIN imagen_item ii      ON ii.imagen_id = i.id
+      LEFT JOIN categoria_items ci  ON ci.id = ii.item_id AND ci.estado = 1
+      LEFT JOIN categorias c2       ON c2.id = ci.categoria_id AND c2.estado = 1 AND c2.rol <> 'filtro'
+
+      WHERE i.negocio_id = ? AND i.id = ?
+      GROUP BY i.id
+      LIMIT 1
+    `;
+
+    const [rows] = await db.query(sql, [negocioId, id]);
+    const r = rows?.[0];
+    if (!r) return res.status(200).json({});
+
+    let categorias = [];
+    let items = [];
+    try { categorias = JSON.parse(r.categorias_json || '[]').filter(x => x && x.id); } catch {}
+    try { items      = JSON.parse(r.items_json || '[]').filter(x => x && x.id); } catch {}
+
+    const catMap = new Map();
+    categorias.forEach(c => catMap.set(c.id, { ...c, items: [] }));
+    items.forEach(it => {
+      const cat = catMap.get(it.categoria_id);
+      if (cat && cat.rol !== 'filtro') {
+        cat.items.push({ id: it.id, label: it.label, categoria_id: it.categoria_id });
+      }
+    });
+
+    res.json({
+      id: r.id,
+      negocio_id: r.negocio_id,
+      url: r.url,
+      public_id: r.public_id,
+      ancho: r.ancho,
+      alto: r.alto,
+      formato: r.formato,
+      bytes: r.bytes,
+      estado: r.estado,
+      fecha_cargue: r.fecha_cargue,
+      titulo: r.titulo,
+      alt_text: r.alt_text,
+      categorias: Array.from(catMap.values())
+    });
+  } catch (e) {
+    console.error('❌ GET /imagenes/:id:', e);
+    res.status(200).json({});
+  }
+});
+
 /* ================================================================== *
  * POST: Subir imágenes (Cloudinary) y registrar en BD
  * POST /api/negocios/:negocioId/imagenes

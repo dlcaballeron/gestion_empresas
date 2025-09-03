@@ -6,6 +6,10 @@ const router = express.Router();
 const db = require('../../db');
 
 /* --------------------------- Helpers --------------------------- */
+// --- pon esto una sola vez, cerca de los imports ---
+const PRICE_MODE = process.env.PRICE_MODE || 'global'; // 'global' | 'product' | 'product_over_global'
+
+
 const toInt = (v, def = null) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
@@ -281,6 +285,7 @@ router.put('/api/negocios/:negocioId/productos/:id/opciones', async (req, res) =
     }
 
     if (values.length) {
+      // Si existe índice único (product_id, categoria_id, item_id) esto no duplica
       await cx.query(
         `INSERT INTO producto_opcion_precio (product_id, categoria_id, item_id, precio)
          VALUES ?`,
@@ -299,27 +304,113 @@ router.put('/api/negocios/:negocioId/productos/:id/opciones', async (req, res) =
   }
 });
 
+/* ================================================================
+ * 🎯 PRECIOS GLOBALES DE ATRIBUTOS (por negocio)
+ *     GET/PUT /api/negocios/:negocioId/atributos/precios
+ *     (se usan en el marketplace: tabla negocio_item_precio)
+ * ================================================================*/
+router.get('/api/negocios/:negocioId/atributos/precios', async (req, res) => {
+  try {
+    const negocioId = toInt(req.params.negocioId);
+    if (!negocioId) return res.status(400).json({ error: 'negocioId inválido' });
+
+    const [rows] = await db.query(
+      `SELECT categoria_id, item_id, precio
+         FROM negocio_item_precio
+        WHERE negocio_id = ?`,
+      [negocioId]
+    );
+    res.json(rows);
+  } catch (e) {
+    console.error('[atributos.precios.get]', e);
+    res.status(500).json({ error: 'Error obteniendo precios de atributos' });
+  }
+});
+
+/**
+ * PUT /api/negocios/:negocioId/atributos/precios
+ * Body: { precios: [{categoria_id,item_id,precio}, ...] }
+ * Reemplaza TODO el set de precios globales del negocio.
+ */
+router.put('/api/negocios/:negocioId/atributos/precios', async (req, res) => {
+  const conn = typeof db.getConnection === 'function' ? await db.getConnection() : null;
+  const cx   = conn || db;
+  try {
+    const negocioId = toInt(req.params.negocioId);
+    if (!negocioId) {
+      if (conn) conn.release?.();
+      return res.status(400).json({ error: 'negocioId inválido' });
+    }
+
+    const precios = Array.isArray(req.body?.precios) ? req.body.precios : [];
+
+    if (conn) await conn.beginTransaction();
+    await cx.query(`DELETE FROM negocio_item_precio WHERE negocio_id=?`, [negocioId]);
+
+    const values = [];
+    for (const o of precios) {
+      const catId  = toInt(o?.categoria_id);
+      const itemId = toInt(o?.item_id);
+      const precio = toMoney(o?.precio, 0);
+      if (negocioId && catId && itemId && precio >= 0) {
+        values.push([negocioId, catId, itemId, precio]);
+      }
+    }
+    if (values.length) {
+      await cx.query(
+        `INSERT INTO negocio_item_precio (negocio_id, categoria_id, item_id, precio)
+         VALUES ?`,
+        [values]
+      );
+    }
+
+    if (conn) await conn.commit();
+    res.json({ ok: true, count: values.length });
+  } catch (e) {
+    if (conn) { try { await conn.rollback(); } catch {} }
+    console.error('[atributos.precios.put]', e);
+    res.status(500).json({ error: 'Error guardando precios de atributos' });
+  } finally {
+    if (conn) conn.release?.();
+  }
+});
+
 /* ======================== MARKETPLACE FEED ======================== */
 /**
  * GET /api/negocios/:negocioId/marketplace
  * Params: q?, categoriaId?, page?, size?
+ *
+ * Devuelve:
+ *  - filtros (rol='filtro')
+ *  - atributos (rol='atributo') con items [{id,label,recargo}]
+ *  - recargo = COALESCE(pop.precio, 0) + COALESCE(nip.precio, 0)
+ *              (precio específico por producto + precio global por negocio)
  */
+
+// ======================== MARKETPLACE FEED ========================
+// GET /api/negocios/:negocioId/marketplace
+// Config de modo de precios para el marketplace
+// Valores: 'global' | 'product' | 'product_over_global'
+
+
+// ======================== MARKETPLACE FEED ========================
+// GET /api/negocios/:negocioId/marketplace
 router.get('/api/negocios/:negocioId/marketplace', async (req, res) => {
   try {
-    const negocioId  = toInt(req.params.negocioId);
+    const negocioId  = Number(req.params.negocioId) || null;
     if (!negocioId) return res.status(400).json({ error: 'negocioId inválido' });
 
     const q           = (req.query.q || '').toString().trim();
-    const categoriaId = toInt(req.query.categoriaId); // rol 'filtro'
-    const page        = Math.max(1, toInt(req.query.page, 1));
-    const size        = Math.min(200, Math.max(1, toInt(req.query.size, 20)));
+    const categoriaId = req.query.categoriaId ? Number(req.query.categoriaId) : null; // rol=filtro
+    const page        = Math.max(1, Number(req.query.page) || 1);
+    const size        = Math.min(200, Math.max(1, Number(req.query.size) || 20));
     const offset      = (page - 1) * size;
 
-    const baseWhere = [
-      'p.negocio_id = ?',
-      'p.estado = 1',
-      'i.estado = 1'
-    ];
+    // Evita truncado de GROUP_CONCAT
+    await db.query('SET SESSION group_concat_max_len = 1000000');
+
+    // WHERE base + params
+    const baseWhere = ['p.negocio_id = ?', 'p.estado = 1', 'i.estado = 1'];
     const params = [negocioId];
 
     if (q) {
@@ -331,86 +422,102 @@ router.get('/api/negocios/:negocioId/marketplace', async (req, res) => {
     if (categoriaId) {
       baseWhere.push(`EXISTS (
         SELECT 1
-          FROM imagen_categoria fc
-          JOIN categorias c2 ON c2.id = fc.categoria_id
-         WHERE fc.imagen_id = i.id
+          FROM imagen_categoria fc2
+          JOIN categorias c2 ON c2.id = fc2.categoria_id
+         WHERE fc2.imagen_id = i.id
            AND c2.rol = 'filtro' AND c2.estado = 1
-           AND fc.categoria_id = ?
+           AND fc2.categoria_id = ?
       )`);
       params.push(categoriaId);
     }
 
-    // Total
-    const [cntRows] = await db.query(
-      `SELECT COUNT(DISTINCT p.id) AS total
-         FROM productos p
-         JOIN imagenes i ON i.id = p.imagen_id
-        WHERE ${baseWhere.join(' AND ')}`,
-      params
-    );
+    // -------- 1) TOTAL ----------
+    const cntSql = `
+      SELECT COUNT(DISTINCT p.id) AS total
+        FROM productos p
+        JOIN imagenes i ON i.id = p.imagen_id
+       WHERE ${baseWhere.join(' AND ')}`;
+    const [cntRows] = await db.query(cntSql, params);
     const total = Number(cntRows?.[0]?.total || 0);
 
-    // Items
-    const [rows] = await db.query(
-      `SELECT
-         p.id,
-         p.nombre,
-         p.descripcion,
-         p.base_precio,
-         p.imagen_id,
-         i.url     AS imagen_url,
-         i.titulo  AS imagen_titulo,
+    // -------- 2) ITEMS ----------
+    // Modo de precios (qué recargo enviar en attrs_raw)
+    const priceJoinPOP = (PRICE_MODE === 'global') ? '' : `
+      LEFT JOIN producto_opcion_precio pop
+             ON pop.product_id   = p.id
+            AND pop.categoria_id = ca.id
+            AND pop.item_id      = ci.id`;
 
-         -- filtros (rol='filtro') asignados a la imagen
-         GROUP_CONCAT(DISTINCT CONCAT_WS('|', fcg.id, fcg.nombre) SEPARATOR ';;') AS filtros_raw,
+    const priceExpr =
+      PRICE_MODE === 'global'
+        ? 'ROUND(COALESCE(nip.precio, 0), 0)'
+        : PRICE_MODE === 'product'
+          ? 'ROUND(COALESCE(pop.precio, 0), 0)'
+          : 'ROUND(COALESCE(pop.precio, nip.precio, 0), 0)'; // product_over_global
 
-         -- atributos (rol='atributo') asignados a la imagen + recargo configurado
-         GROUP_CONCAT(DISTINCT CONCAT_WS('|',
-           ca.id, ca.nombre,          -- categoría atributo
-           ci.id, ci.label,           -- item
-           COALESCE(pop.precio, 0)    -- recargo
-         ) SEPARATOR ';;') AS attrs_raw
+    const sql = `
+      SELECT
+        p.id,
+        p.nombre,
+        p.descripcion,
+        p.base_precio,
+        p.imagen_id,
+        i.url     AS imagen_url,
+        i.titulo  AS imagen_titulo,
 
-       FROM productos p
-       JOIN imagenes i ON i.id = p.imagen_id
+        -- Filtros (rol='filtro')
+        GROUP_CONCAT(DISTINCT CONCAT_WS('|', cf.id, cf.nombre) SEPARATOR ';;') AS filtros_raw,
 
-       -- Filtros
-       LEFT JOIN imagen_categoria   fc  ON fc.imagen_id = i.id
-       LEFT JOIN categorias         fcg ON fcg.id = fc.categoria_id
-            AND fcg.rol = 'filtro' AND fcg.estado = 1
+        -- Atributos (rol='atributo') con recargo según PRICE_MODE
+        GROUP_CONCAT(DISTINCT CONCAT_WS('|',
+          ca.id, ca.nombre,                         -- categoría
+          ci.id,
+          COALESCE(NULLIF(ci.label,''), CONCAT('Item ', ci.id)), -- etiqueta del ítem
+          ${priceExpr}                               -- recargo
+        ) SEPARATOR ';;') AS attrs_raw
 
-       -- Atributos: imagen_item -> categoria_items -> categorias
-       LEFT JOIN imagen_item        ii  ON ii.imagen_id = i.id
-       LEFT JOIN categoria_items    ci  ON ci.id = ii.item_id AND ci.estado = 1
-       LEFT JOIN categorias         ca  ON ca.id = ci.categoria_id
+      FROM productos p
+      JOIN imagenes i ON i.id = p.imagen_id
+
+      -- Filtros
+      LEFT JOIN imagen_categoria fc ON fc.imagen_id = i.id
+      LEFT JOIN categorias cf ON cf.id = fc.categoria_id
+            AND cf.rol = 'filtro' AND cf.estado = 1
+
+      -- Atributos
+      LEFT JOIN imagen_item     ii ON ii.imagen_id = i.id
+      LEFT JOIN categoria_items ci ON ci.id = ii.item_id
+      LEFT JOIN categorias      ca ON ca.id = ci.categoria_id
             AND ca.rol = 'atributo' AND ca.estado = 1
 
-       -- Recargos por ítem configurados en el producto
-       LEFT JOIN producto_opcion_precio pop
-              ON pop.product_id = p.id
-             AND pop.categoria_id = ca.id
-             AND pop.item_id = ci.id
+      -- Precio GLOBAL por negocio
+      LEFT JOIN negocio_item_precio nip
+             ON nip.negocio_id   = p.negocio_id
+            AND nip.categoria_id = ca.id
+            AND nip.item_id      = ci.id
+
+      ${priceJoinPOP}  -- si PRICE_MODE !== 'global', se inyecta el JOIN a pop
 
       WHERE ${baseWhere.join(' AND ')}
       GROUP BY p.id
       ORDER BY p.id DESC
-      LIMIT ? OFFSET ?`,
-      [...params, size, offset]
-    );
+      LIMIT ? OFFSET ?`;
+
+    const [rows] = await db.query(sql, [...params, size, offset]);
 
     // Parseo
     const items = rows.map(r => {
       const filtros = (r.filtros_raw || '')
         .split(';;').filter(Boolean)
-        .map(x => {
-          const [id, nombre] = x.split('|');
+        .map(s => {
+          const [id, nombre] = s.split('|');
           return { id: Number(id), nombre };
         });
 
       const atributos = (r.attrs_raw || '')
         .split(';;').filter(Boolean)
-        .map(x => {
-          const [catId, catNombre, itemId, itemLabel, recargo] = x.split('|');
+        .map(s => {
+          const [catId, catNombre, itemId, itemLabel, recargo] = s.split('|');
           return {
             categoria: { id: Number(catId), nombre: catNombre },
             item:      { id: Number(itemId), label: itemLabel },
@@ -420,8 +527,8 @@ router.get('/api/negocios/:negocioId/marketplace', async (req, res) => {
 
       return {
         id: r.id,
-        nombre: r.nombre,
-        descripcion: r.descripcion,
+        nombre: r.nombre || r.imagen_titulo || `Producto ${r.id}`,
+        descripcion: r.descripcion || '',
         base_precio: Number(r.base_precio || 0),
         imagen_id: r.imagen_id,
         imagen_url: r.imagen_url,
@@ -431,11 +538,15 @@ router.get('/api/negocios/:negocioId/marketplace', async (req, res) => {
       };
     });
 
-    res.json({ total, page, size, items });
+    return res.json({ total, page, size, items });
   } catch (e) {
-    console.error('[marketplace.list]', e);
-    res.status(500).json({ error: 'Error listando marketplace' });
+    console.error('[marketplace.list] ERROR:', e && (e.sqlMessage || e.message), e);
+    return res.status(500).json({ error: 'Error listando marketplace' });
   }
 });
+
+
+
+
 
 module.exports = router;
