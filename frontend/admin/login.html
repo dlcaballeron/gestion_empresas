@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login Administrador</title>
+  <link rel="stylesheet" href="../css/admin/login-style.css" />
+</head>
+<body>
+  <div class="login-container">
+    <h2>Login Administrador</h2>
+    <form id="loginForm">
+      <input type="email" id="email" name="email" placeholder="Correo" required />
+      <div class="password-wrapper">
+        <input type="password" id="password" name="password" placeholder="Contraseña" required />
+        <span class="toggle-password" onclick="togglePassword()">👁️</span>
+      </div>
+      <button type="submit">Iniciar Sesión</button>
+    </form>
+    <div class="link-register">
+      ¿No tienes cuenta? <a href="registro.html">Regístrate</a>
+    </div>
+    <div id="errorMsg" class="error"></div>
+  </div>
+
+  <script>
+    function togglePassword() {
+      const passwordInput = document.getElementById("password");
+      passwordInput.type = passwordInput.type === "password" ? "text" : "password";
+    }
+
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      const errorMsg = document.getElementById("errorMsg");
+      errorMsg.textContent = "";
+
+      console.log("🔐 Enviando login...");
+      console.log("📨 Email:", email);
+      console.log("📨 Password (oculto)");
+
+      try {
+        const res = await fetch("/api/usuarios/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        console.log("🔁 Respuesta recibida");
+
+        const result = await res.json();
+        console.log("📦 Resultado del servidor:", result);
+
+        if (res.ok) {
+          console.log("✅ Login exitoso");
+          localStorage.setItem("autenticado", "true");
+          localStorage.setItem("usuario", JSON.stringify({ email }));
+          window.location.href = "componentes/principal/principal.html";
+        } else {
+          console.warn("⚠️ Error en login:", result.error);
+          errorMsg.textContent = result.error || "❌ Credenciales incorrectas";
+        }
+      } catch (error) {
+        console.error("❌ Error de red o servidor:", error);
+        errorMsg.textContent = "❌ Error al conectar con el servidor.";
+      }
+    });
+  </script>
+</body>
+</html>

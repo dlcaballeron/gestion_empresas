@@ -1,0 +1,26 @@
+/* ✅ Estilos para footer */
+footer {
+  background-color: #2c3e50;
+  color: white;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 14px;
+  position: relative;
+  bottom: 0;
+  width: 100%;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+body > .main-content {
+  flex: 1;
+}
+
+footer {
+  margin-top: auto;
+}

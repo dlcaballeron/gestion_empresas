@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Registrar Negocio</title>
+  <!-- Bootstrap CSS CDN -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/admin/form-crearNegocio-style.css"/>
+  <link rel="stylesheet" href="/css/admin/menuLateral-style.css" />
+  <link rel="stylesheet" href="/css/admin/header-style.css" />
+  <link rel="stylesheet" href="/css/admin/footer-style.css" />
+  <style>
+    input[type="text"], input[type="file"], textarea {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header cargado dinámicamente -->
+  <div id="header-container"></div>
+
+  <!-- Menú lateral cargado dinámicamente -->
+  <div id="menu-lateral-container"></div>
+
+  <!-- Contenido principal -->
+  <div class="main-content">
+        <div class="form-container">
+    <div class="container py-5">
+      <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+          <div class="card shadow">
+            <div class="card-body">
+              <h2 class="text-center mb-4">Registrar Nuevo Negocio</h2>
+
+              <form id="formNegocio" enctype="multipart/form-data">
+                <!-- Razón Social -->
+                <div class="mb-3">
+                  <label for="razon_social" class="form-label">Razón Social</label>
+                  <input type="text" id="razon_social" name="razon_social" class="form-control" required maxlength="20" />
+                </div>
+
+                <!-- NIT -->
+                <div class="mb-3">
+                  <label for="nit" class="form-label">NIT</label>
+                  <input type="text" id="nit" name="nit" class="form-control" required maxlength="12"
+                    inputmode="numeric" pattern="\d*" oninput="this.value = this.value.replace(/\D/g, '')" />
+                </div>
+
+                <!-- Teléfono -->
+                <div class="mb-3">
+                  <label for="telefono" class="form-label">Teléfono</label>
+                  <input type="text" id="telefono" name="telefono" class="form-control" required maxlength="10"
+                    inputmode="numeric" pattern="\d*" oninput="this.value = this.value.replace(/\D/g, '')" />
+                </div>
+
+                <!-- Recibe pagos -->
+                <div class="form-check mb-3">
+                  <input type="checkbox" id="recibe_pagos" name="recibe_pagos" class="form-check-input" />
+                  <label class="form-check-label" for="recibe_pagos">Recibe pagos</label>
+                </div>
+
+                <!-- Descripción -->
+                <div class="mb-3">
+                  <label for="descripcion" class="form-label">Descripción</label>
+                  <textarea id="descripcion" name="descripcion" class="form-control" rows="3" maxlength="30"></textarea>
+                </div>
+
+                <!-- Logo -->
+                <div class="mb-4">
+                  <label for="logo" class="form-label">Logo (imagen)</label>
+                  <input type="file" id="logo" name="logo" class="form-control" accept="image/*" required />
+                </div>
+
+                <!-- Botones -->
+                <div class="d-flex justify-content-between">
+                  <button type="submit" class="btn btn-success">Crear</button>
+                  <button type="button" class="btn btn-danger" onclick="window.location.href='/admin/componentes/principal/principal.html'">Cancelar</button>
+                </div>
+
+                <!-- URL generada -->
+                <div class="mt-4" id="urlContainer" style="display: none;">
+                  <label for="url_publica" class="form-label">URL Pública generada:</label>
+                  <div class="input-group">
+                    <input type="text" id="url_publica" class="form-control" readonly />
+                    <button type="button" class="btn btn-primary" onclick="copiarURL()">Copiar</button>
+                  </div>
+                </div>
+              </form>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+  <!-- Footer cargado dinámicamente -->
+  <div id="footer-container"></div>
+
+  <!-- JS para componentes comunes -->
+  <script src="/admin/js/header.js"></script>
+  <script src="/admin/js/footer.js"></script>
+  <script src="/admin/js/menu-lateral.js"></script>
+
+  <!-- JS de lógica del formulario -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const form = document.getElementById("formNegocio");
+
+      // Validar sesión
+      const usuario = JSON.parse(localStorage.getItem("usuario"));
+      if (!usuario) {
+        alert("Debe iniciar sesión primero.");
+        window.location.href = "/admin/login.html";
+        return;
+      }
+
+      // Cargar datos desde URL (si están presentes)
+      const params = new URLSearchParams(window.location.search);
+      const campos = ["razon_social", "nit", "telefono", "descripcion"];
+      campos.forEach(campo => {
+        const valor = params.get(campo);
+        if (valor) document.getElementById(campo).value = valor;
+      });
+
+      if (params.get("recibe_pagos") === "1") {
+        document.getElementById("recibe_pagos").checked = true;
+      }
+
+      if (params.get("logo")) {
+        console.warn("⚠️ El nombre del logo está en la URL pero no se puede subir automáticamente.");
+      }
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const razon = document.getElementById("razon_social").value.trim();
+        const nit = document.getElementById("nit").value.trim();
+        const telefono = document.getElementById("telefono").value.trim();
+        const descripcion = document.getElementById("descripcion").value.trim();
+         const logo = document.getElementById("logo").files[0];
+
+        // Validaciones
+        if (!/^\d{9,12}$/.test(nit)) {
+          return alert("❌ El NIT debe contener entre 9 y 12 dígitos numéricos.");
+        }
+
+        if (!/^\d{10}$/.test(telefono)) {
+          return alert("❌ El teléfono debe contener exactamente 10 dígitos numéricos.");
+        }
+
+        if (razon.length > 20) {
+          return alert("❌ La razón social no debe tener más de 20 caracteres.");
+        }
+
+        if (descripcion.length > 30) {
+          return alert("❌ La descripción no debe tener más de 30 caracteres.");
+        }
+        if (!logo) {
+          return alert("❌ Debes seleccionar un logo antes de continuar.");
+        }
+
+        const formData = new FormData(form);
+        formData.set("recibe_pagos", document.getElementById("recibe_pagos").checked ? 1 : 0);
+
+        try {
+          const response = await fetch('/api/negocios/crear', {
+            method: 'POST',
+            body: formData
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert("✅ Negocio creado con éxito");
+
+              // Limpiar formulario
+             form.reset();
+            const urlInput = document.getElementById("url_publica");
+            const urlContainer = document.getElementById("urlContainer");
+            urlInput.value = result.url_publica;
+            urlContainer.style.display = "block";
+          } else {
+            alert(result.error || "❌ Error al crear negocio");
+          }
+        } catch (error) {
+          console.error("❌ Error en la solicitud:", error);
+          alert("❌ Ocurrió un error al conectar con el servidor.");
+        }
+      });
+
+      if (
+        params.get("razon_social") &&
+        params.get("nit") &&
+        params.get("telefono") &&
+        params.get("descripcion") &&
+        params.get("logo")
+      ) {
+        alert("ℹ️ No se puede cargar el logo automáticamente. Por favor selecciónelo antes de enviar.");
+      }
+    });
+
+    function copiarURL() {
+      const input = document.getElementById("url_publica");
+      input.select();
+      input.setSelectionRange(0, 99999);
+      document.execCommand("copy");
+      alert("📋 URL copiada al portapapeles");
+    }
+  </script>
+</body>
+</html>

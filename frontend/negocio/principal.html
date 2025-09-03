@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Marketplace del Negocio</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="/css/negocio/principal-style.css" />
+</head>
+<body class="bg-light d-flex flex-column min-vh-100">
+
+  <!-- Header parcial -->
+  <div id="appHeader"></div>
+
+  <!-- Layout -->
+  <div class="container-fluid market-wrapper flex-grow-1">
+    <div class="row g-0">
+      <!-- Sidebar filtros -->
+      <aside class="col-lg-3 border-end bg-white">
+        <div class="d-none d-lg-block p-3">
+          <h6 class="mb-3">Filtros</h6>
+          <div class="sticky-top-2">
+            <!-- CATEGORÍA (se llena por JS con la categoría cuyo rol = 'filtro') -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold d-block">Categoría</label>
+              <div class="d-flex flex-wrap gap-2" id="categoryPills">
+                <!-- Render dinámico -->
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Disponibilidad</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="inStock">
+                <label class="form-check-label" for="inStock">En stock</label>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Calificación mínima</label>
+              <select id="minRating" class="form-select">
+                <option value="0">Cualquiera</option>
+                <option value="1">★ 1+</option>
+                <option value="2">★ 2+</option>
+                <option value="3">★ 3+</option>
+                <option value="4">★ 4+</option>
+              </select>
+            </div>
+
+            <div class="d-grid gap-2">
+              <button id="btnApply" class="btn btn-primary">Aplicar</button>
+              <button id="btnClear" class="btn btn-outline-secondary">Limpiar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Offcanvas filtros (mobile) -->
+        <div class="offcanvas offcanvas-start" tabindex="-1" id="offcanvasFilters">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title">Filtros</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Buscar</label>
+              <input id="qMobile" class="form-control" type="search" placeholder="Buscar…">
+            </div>
+
+            <!-- CATEGORÍA (mobile) -->
+            <div class="mb-3">
+              <label class="form-label fw-semibold d-block">Categoría</label>
+              <div class="d-flex flex-wrap gap-2" id="categoryPillsMobile">
+                <!-- Render dinámico -->
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Disponibilidad</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="inStockMobile">
+                <label class="form-check-label" for="inStockMobile">En stock</label>
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Calificación mínima</label>
+              <select id="minRatingMobile" class="form-select">
+                <option value="0">Cualquiera</option>
+                <option value="1">★ 1+</option>
+                <option value="2">★ 2+</option>
+                <option value="3">★ 3+</option>
+                <option value="4">★ 4+</option>
+              </select>
+            </div>
+            <div class="d-grid gap-2 mt-2">
+              <button id="btnApplyMobile" class="btn btn-primary" data-bs-dismiss="offcanvas">Aplicar</button>
+              <button id="btnClearMobile" class="btn btn-outline-secondary">Limpiar</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main -->
+      <main class="col-lg-9">
+        <div class="p-3">
+          <div class="d-flex flex-wrap align-items-center justify-content-between grid-controls mb-3">
+            <div class="d-flex align-items-center gap-2">
+              <span class="result-count small text-secondary"><span id="totalFound">0</span> resultados</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <!-- buscador sólo en mobile -->
+              <form id="searchFormTop" class="d-lg-none" style="min-width:220px;">
+                <div class="input-group">
+                  <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                  <input id="qTop" class="form-control" type="search" placeholder="Buscar…">
+                </div>
+              </form>
+              <select id="sortBy" class="form-select" style="min-width:220px;">
+                <option value="relevance">Ordenar: Relevancia</option>
+                <option value="price_asc">Precio: menor a mayor</option>
+                <option value="price_desc">Precio: mayor a menor</option>
+                <option value="rating_desc">Mejor calificados</option>
+                <option value="newest">Más recientes</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="grid" class="row g-3"></div>
+
+          <div class="text-center my-4">
+            <button id="btnLoadMore" class="btn btn-outline-primary px-4">Cargar más</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Modal Detalle -->
+  <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-body p-0">
+          <div class="row g-0">
+            <div class="col-md-6">
+              <img id="modalImg" class="w-100 h-100" style="object-fit:cover;" alt="">
+            </div>
+            <div class="col-md-6 p-3">
+              <h5 id="modalTitle" class="mb-1"></h5>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <div id="modalRating" class="rating text-warning"></div>
+                <span id="modalCategory" class="badge text-bg-secondary"></span>
+              </div>
+
+              <!-- contenedor para las categorías de filtro (rol='filtro') -->
+              <div id="modalFiltroCats" class="mb-2"></div>
+
+              <div class="h4 price mb-3" id="modalPrice"></div>
+              <p id="modalDesc" class="text-secondary small"></p>
+
+              <!-- categorías/ítems asignados (atributos con ítems) -->
+              <div id="modalExtraCats" class="mb-3 small"></div>
+
+              <div class="d-flex gap-2">
+                <button id="modalAddBtn" class="btn btn-sm btn-primary">Añadir</button>
+                <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>        
+      </div>
+    </div>
+  </div>
+
+  <!-- ========= IMPORTANTE =========
+       Usa un SOLO adminPanel en el proyecto.
+       Si tu header.html ya trae #adminPanel, elimina ese del header
+       y deja este (completo) para evitar IDs duplicados. -->
+  <!-- Offcanvas: Panel del Administrador -->
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="adminPanel" aria-labelledby="adminPanelLabel">
+    <div class="offcanvas-header">
+      <div>
+        <h5 class="offcanvas-title" id="adminPanelLabel">Panel del administrador</h5>
+        <div class="small text-secondary" id="adminNegocioInfo">—</div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <!-- Logo -->
+      <section class="mb-4">
+        <h6 class="fw-bold mb-2">Logo del negocio</h6>
+        <div class="d-flex align-items-center gap-3">
+          <img id="previewLogo" src="" alt="Logo" style="width:56px;height:56px;border-radius:.5rem;object-fit:cover;border:1px solid #e5e7eb;">
+          <div class="flex-grow-1">
+            <input type="file" id="fileLogo" accept="image/*" class="form-control form-control-sm mb-2">
+            <div class="d-flex gap-2">
+              <button id="btnSaveLogo" class="btn btn-primary btn-sm" disabled>Guardar logo</button>
+              <button id="btnResetLogo" class="btn btn-outline-secondary btn-sm" disabled>Revertir</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Portada -->
+      <section class="mb-4">
+        <h6 class="fw-bold mb-2">Imagen de portada</h6>
+        <img id="previewPortada" src="" alt="Portada" class="w-100 mb-2" style="height:120px;object-fit:cover;border:1px solid #e5e7eb;border-radius:.5rem;">
+        <input type="file" id="filePortada" accept="image/*" class="form-control form-control-sm mb-2">
+        <div class="d-flex gap-2">
+          <button id="btnSavePortada" class="btn btn-primary btn-sm" disabled>Guardar portada</button>
+          <button id="btnResetPortada" class="btn btn-outline-secondary btn-sm" disabled>Revertir</button>
+        </div>
+      </section>
+
+      <!-- Categorías (gestión) -->
+      <section>
+        <h6 class="fw-bold mb-2">Categorías</h6>
+        <form id="formCategoria" class="row g-2 mb-3">
+          <div class="col-8">
+            <input id="catNombre" type="text" class="form-control form-control-sm" placeholder="Nombre de la categoría" maxlength="30" required>
+          </div>
+          <div class="col-4 d-grid">
+            <button class="btn btn-sm btn-success" type="submit">
+              <i class="bi bi-plus-lg me-1"></i>Agregar
+            </button>
+          </div>
+        </form>
+        <ul id="listaCategorias" class="list-group list-group-flush small"></ul>
+      </section>
+    </div>
+  </div>
+
+  <!-- Modal: Galería del marketplace -->
+  <div class="modal fade" id="galeriaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title">Galería del marketplace</h5>
+            <div class="small text-secondary" id="galeriaSubtitulo">—</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Barra de acciones -->
+          <div class="row g-2 align-items-start mb-2">
+            <!-- Col izquierda: subida -->
+            <div class="col-12 col-lg-6">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text bg-white"><i class="bi bi-upload"></i></span>
+                <input id="filesGaleriaModal" type="file" class="form-control" accept="image/*" multiple>
+              </div>
+              <div class="mt-2">
+                <button id="btnSubirGaleriaModal" class="btn btn-sm btn-primary">Subir seleccionadas</button>
+              </div>
+            </div>
+
+            <!-- Col derecha: herramientas de selección -->
+            <div class="col-12 col-lg-6 d-flex flex-wrap gap-2 justify-content-lg-end">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="switchSeleccionar">
+                <label class="form-check-label" for="switchSeleccionar">Seleccionar</label>
+              </div>
+              <span class="small text-secondary align-self-center" id="selCountLabel">0 seleccionadas</span>
+
+              <button id="btnOpenAsignar" class="btn btn-sm btn-outline-primary" disabled>
+                <i class="bi bi-tags me-1"></i>Asignar categorías
+              </button>
+              <button id="btnClearAsignaciones" class="btn btn-sm btn-outline-danger" disabled>
+                <i class="bi bi-x-circle me-1"></i>Quitar configuración
+              </button>
+            </div>
+          </div>
+
+          <!-- Grid de imágenes -->
+          <div class="row row-cols-2 row-cols-md-4 row-cols-xl-6 g-3 mt-2" id="gridGaleriaModal">
+            <!-- Render por JS -->
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Asignar categorías / ítems -->
+  <div class="modal fade" id="asignarModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Asignar categorías a <span id="assignCount">0</span> imágenes</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12 col-md-7">
+              <div class="border rounded p-2" style="max-height: 360px; overflow:auto">
+                <!-- Árbol categorías → ítems -->
+                <div id="assignTree" class="small">
+                  <!-- Render por JS -->
+                </div>
+              </div>
+            </div>
+            <div class="col-12 col-md-5">
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Modo de aplicación</label>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="assignMode" id="rbAssignAdd" value="add" checked>
+                  <label class="form-check-label" for="rbAssignAdd">Agregar (conservar lo existente)</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="assignMode" id="rbAssignReplace" value="replace">
+                  <label class="form-check-label" for="rbAssignReplace">Reemplazar (limpia y asigna nuevo)</label>
+                </div>
+              </div>
+              <div class="alert alert-light border small">
+                <i class="bi bi-info-circle me-1"></i>
+                Marcá una o varias <b>categorías</b> y, si quieres, sus <b>ítems</b>. Luego pulsa <b>Aplicar</b>.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer d-flex justify-content-between">
+          <button id="btnAssignClear" class="btn btn-outline-danger">Quitar TODA la configuración</button>
+          <div>
+            <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button id="btnAssignApply" class="btn btn-primary">Aplicar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Categorías -->
+  <div class="modal fade" id="categoriasModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title">Categorías</h5>
+            <div class="small text-secondary" id="categoriasSubtitulo">—</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          <!-- =============================== -->
+          <!-- SECCIÓN A: CATEGORÍAS ATRIBUTO -->
+          <!-- =============================== -->
+          <div class="row g-3">
+            <!-- Col izquierda: listado de categorías atributo + crear -->
+            <div class="col-12 col-lg-5">
+              <h6 class="mb-2">Atributos (con ítems)</h6>
+
+              <form id="formNuevaCategoria" class="d-flex gap-2 mb-3" autocomplete="off">
+                <input id="catNombreInput" type="text" class="form-control" placeholder="Nombre de la categoría (p. ej. Materiales)" />
+                <button class="btn btn-success" type="submit">+ Crear</button>
+              </form>
+
+              <ul class="list-group" id="listaCategoriasModal">
+                <!-- li de categorías atributo -->
+              </ul>
+            </div>
+
+            <!-- Col derecha: detalle de ítems -->
+            <div class="col-12 col-lg-7">
+              <div class="card">
+                <div class="card-body">
+                  <h6 class="card-title" id="tituloDetalleCategoria">Selecciona una categoría</h6>
+
+                  <div id="wrapAddItems" class="d-none">
+                    <label class="form-label small text-secondary">Agregar ítems (uno por línea):</label>
+                    <textarea id="itemsTextarea" rows="3" class="form-control mb-2" placeholder="Ejemplo:&#10;papel seda&#10;vinil&#10;cartulina"></textarea>
+
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                      <button id="btnAgregarItems" class="btn btn-primary btn-sm" type="button">Agregar ítems</button>
+                      <button id="btnRenombrarCategoria" class="btn btn-outline-secondary btn-sm" type="button">Renombrar</button>
+                      <button id="btnEliminarCategoria" class="btn btn-outline-danger btn-sm" type="button">Eliminar</button>
+                    </div>
+
+                    <ul class="list-group" id="listaItemsModal">
+                      <!-- ítems de la categoría -->
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- separador -->
+          <div class="mt-4 pt-3 border-top"></div>
+
+          <!-- ================================== -->
+          <!-- SECCIÓN B: CATEGORÍAS DE FILTRO   -->
+          <!-- ================================== -->
+          <div class="row g-3 mt-1">
+            <div class="col-12">
+              <h6 class="mb-2">Categorías de filtro (para la barra lateral)</h6>
+              <p class="small text-secondary mb-3">
+                Estas categorías aparecen como filtros en el marketplace. No tienen ítems; se asignan directamente a las imágenes.
+              </p>
+            </div>
+
+            <div class="col-12 col-lg-7 col-xl-6">
+              <form id="formNuevaCategoriaFiltro" class="d-flex gap-2 mb-3" autocomplete="off">
+                <input id="catFiltroNombreInput" type="text" class="form-control" placeholder="Nombre del filtro (p. ej. Números)" />
+                <button class="btn btn-success" type="submit">+ Crear</button>
+              </form>
+
+              <ul class="list-group" id="listaCategoriasFiltro">
+                <!-- li de categorías filtro -->
+              </ul>
+
+              <div class="small text-secondary mt-2">
+                Consejito: crea filtros generales como <em>Números</em>, <em>Personajes</em>, <em>Temáticas</em>, etc.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer parcial -->
+  <div id="appFooter"></div>
+
+  <!-- JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Carga del inicializador principal (que ya importa y llama loadLayout) -->
+  <script type="module" src="/negocio/js/principal.js?v=4"></script>
+</body>
+</html>

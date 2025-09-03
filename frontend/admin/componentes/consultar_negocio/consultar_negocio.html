@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Consultar Negocios</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/admin/form-consultarNegocio-style.css" />
+  <link rel="stylesheet" href="/css/admin/menuLateral-style.css" />
+  <link rel="stylesheet" href="/css/admin/header-style.css" />
+  <link rel="stylesheet" href="/css/admin/footer-style.css" />
+  
+</head>
+<body>
+  <!-- Header y menú lateral -->
+  <div id="header-container"></div>
+  <div id="menu-lateral-container"></div>
+
+
+  <div class="filtros-container">
+    <form id="filtrosForm">
+      <div class="filtros-grid">
+        <div>
+          <label for="fecha_inicio">Fecha inicio</label>
+          <input type="date" name="fecha_inicio" id="fecha_inicio">
+        </div>
+        <div>
+          <label for="fecha_fin">Fecha fin</label>
+          <input type="date" name="fecha_fin" id="fecha_fin">
+        </div>
+        <div>
+          <label for="razon_social">Razón Social</label>
+          <input type="text" name="razon_social" id="razon_social" placeholder="Buscar razón social">
+        </div>
+        <div>
+          <label for="nit">NIT</label>
+          <input type="text" name="nit" id="nit" placeholder="Buscar NIT">
+        </div>
+        <div>
+          <label for="estado">Estado</label>
+          <select name="estado" id="estado">
+            <option value="">-- Todos --</option>
+            <option value="1">Activo</option>
+            <option value="0">Desactivado</option>
+          </select>
+        </div>
+        <div>
+          <button type="submit" id="btn-aplicar">Filtros de Aplicar</button>
+          <button type="button" id="btn-limpiar">Limpiar</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="main-content">
+    <h2>Negocios Registrados</h2>
+    <div class="table-responsive">
+      <table class="table" id="tablaNegocios">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Razón Social</th>
+            <th>NIT</th>
+            <th>Teléfono</th>
+            <th>Descripción</th>
+            <th>Recibe Pagos</th>
+            <th>Logo</th>
+            <th>URL Pública</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+
+
+
+  <!-- Footer -->
+  <div id="footer-container"></div>
+
+  <!-- Scripts comunes -->
+  <script src="/admin/js/header.js"></script>
+  <script src="/admin/js/footer.js"></script>
+  <script src="/admin/js/menu-lateral.js"></script>
+  <script src="../../js/consultar_negocio.js"></script>
+
+  <script>
+    // Esperar que el DOM esté listo
+    document.addEventListener("DOMContentLoaded", async () => {
+      const usuario = JSON.parse(localStorage.getItem("usuario"));
+      if (!usuario) {
+        alert("Debe iniciar sesión primero.");
+        return window.location.href = "/admin/login.html";
+      }
+
+      try {
+        const res = await fetch("/api/consultar-negocios/consultar");
+        const negocios = await res.json();
+        const tbody = document.querySelector("#tablaNegocios tbody");
+        tbody.innerHTML = "";
+
+        if (negocios.length === 0) {
+          tbody.innerHTML = "<tr><td colspan='10' class='text-center'>No hay negocios registrados</td></tr>";
+          return;
+        }
+
+        negocios.forEach((negocio, index) => {
+          const fila = document.createElement("tr");
+          fila.innerHTML = `
+            <td>${index + 1}</td>
+            <td><input type="text" value="${negocio.razon_social}" disabled /></td>
+            <td><input type="text" value="${negocio.nit}" disabled /></td>
+            <td><input type="text" value="${negocio.telefono}" disabled /></td>
+            <td><input type="text" value="${negocio.descripcion}" disabled style="max-width: 200px" /></td>
+            <td><input type="checkbox" ${negocio.recibe_pagos ? 'checked' : ''} disabled /></td>
+            <td><img src="${negocio.logo}" alt="logo" width="50"/></td>
+            <td><a href="${negocio.url_publica || '#'}" target="_blank">Ver</a></td>
+            <td class="estado">${negocio.estado === 1 ? "Activo" : "Desactivado"}</td>
+            <td>
+              <button class="btn-modificar btn btn-warning" data-id="${negocio.id}">Modificar</button>
+              <button class="btn-estado btn btn-secondary" data-id="${negocio.id}" data-estado="${negocio.estado}">
+                ${negocio.estado === 1 ? 'Desactivar' : 'Activar'}
+              </button>
+            </td>
+          `;
+          tbody.appendChild(fila);
+        });
+
+        // Agregar eventos después de renderizar
+        document.querySelectorAll(".btn-modificar").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            const row = e.target.closest("tr");
+            const id = btn.getAttribute("data-id");
+
+            // Confirmación
+            if (!confirm("¿Deseas modificar este negocio?")) return;
+
+            if (btn.textContent === "Modificar") {
+              btn.textContent = "Pendiente Actualizar";
+              row.querySelectorAll("input[type='text'], input[type='checkbox']").forEach(input => input.disabled = false);
+            } else {
+              const inputs = row.querySelectorAll("input");
+              const razon_social = inputs[0].value;
+              const nit = inputs[1].value;
+              const telefono = inputs[2].value;
+              const descripcion = inputs[3].value;
+              const recibe_pagos = inputs[4].checked ? 1 : 0;
+
+              try {
+                const res = await fetch(`/api/consultar-negocios/actualizar/${id}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ razon_social, nit, telefono, descripcion, recibe_pagos })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                  alert(data.mensaje);
+                  btn.textContent = "Modificar";
+                  row.querySelectorAll("input").forEach(input => input.disabled = true);
+                } else {
+                  throw new Error(data.error || "Error al actualizar");
+                }
+              } catch (err) {
+                alert("❌ Error al actualizar negocio");
+                console.error(err);
+              }
+            }
+          });
+        });
+
+        document.querySelectorAll(".btn-estado").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            const estadoActual = parseInt(btn.getAttribute("data-estado"));
+            const nuevoEstado = estadoActual === 1 ? 0 : 1;
+
+            const confirmar = confirm(`¿Estás seguro de ${nuevoEstado === 1 ? 'activar' : 'desactivar'} este negocio?`);
+            if (!confirmar) return;
+
+            try {
+              const res = await fetch(`/api/consultar-negocios/estado/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nuevo_estado: nuevoEstado })
+              });
+
+              const data = await res.json();
+              if (res.ok) {
+                alert(data.mensaje);
+                location.reload();
+              } else {
+                throw new Error(data.error || "Error al cambiar estado");
+              }
+            } catch (err) {
+              alert("❌ Error al cambiar el estado del negocio");
+              console.error(err);
+            }
+          });
+        });
+
+      } catch (error) {
+        console.error("❌ Error al cargar negocios:", error);
+        document.getElementById("tablaNegocios").innerHTML =
+          "<tr><td colspan='10' class='text-center text-danger'>Error al cargar datos</td></tr>";
+      }
+    });
+  </script>
+</body>
+</html>

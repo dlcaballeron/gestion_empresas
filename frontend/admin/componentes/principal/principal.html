@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Panel Principal</title>
+  <link rel="stylesheet" href="../../../css/admin/menuLateral-style.css" />
+  <link rel="stylesheet" href="../../../css/admin/principal-style.css" />
+  <link rel="stylesheet" href="/css/admin/header-style.css" />
+  <link rel="stylesheet" href="/css/admin/footer-style.css" />
+</head>
+<body>
+
+  <!-- Header cargado dinámicamente -->
+  <div id="header-container"></div>
+
+  <!-- Menú lateral (cargado por JS) -->
+  <div id="menu-lateral-container"></div>
+
+  <!-- Contenido principal -->
+  <div class="content">
+    <h2>Bienvenido al Panel Principal</h2>
+    <p>Selecciona una opción del menú lateral.</p>
+    <p id="bienvenidaUsuario"></p>
+  </div>
+
+  <div id="footer-container"></div>
+
+
+  <!-- JS para componentes comunes -->
+  <script src="/admin/js/header.js"></script>
+  <script src="/admin/js/footer.js"></script>
+  <script src="/admin/js/menu-lateral.js"></script>
+  <script>
+    // Validar sesión activa
+    const usuario = JSON.parse(localStorage.getItem("usuario"));
+    if (!usuario) {
+      alert("Debe iniciar sesión primero.");
+      window.location.href = "login.html";
+    } else {
+      // Mostrar bienvenida si se desea
+      const bienvenida = document.getElementById("bienvenidaUsuario");
+      bienvenida.textContent = `👋 Hola, ${usuario.email}`;
+    }
+
+    // Función para cerrar sesión
+    function cerrarSesion() {
+      if (confirm("¿Deseas cerrar sesión?")) {
+        localStorage.removeItem("usuario");
+        localStorage.removeItem("autenticado");
+        alert("Sesión cerrada correctamente.");
+        window.location.href = "login.html";
+      }
+    }
+  </script>
+
+</body>
+</html>

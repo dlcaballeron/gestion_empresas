@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Registro de Usuario</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
+    <h2 class="text-2xl font-bold text-center mb-6 text-gray-800">Registro de Usuario</h2>
+    <form id="registroForm" class="space-y-4">
+      <input type="text" id="nombre" placeholder="Nombre" maxlength="20" required
+        class="w-full border border-gray-300 px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+      <input type="text" id="apellido" placeholder="Apellido" maxlength="20" required
+        class="w-full border border-gray-300 px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+      <input type="email" id="email" placeholder="Correo (.co o .com)" required
+        class="w-full border border-gray-300 px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+      <div class="relative">
+        <input type="password" id="password" placeholder="Contraseña" required
+          class="w-full border border-gray-300 px-4 py-2 pr-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <span onclick="togglePassword(this, 'password')" class="absolute right-3 top-2.5 cursor-pointer text-gray-500">👁️</span>
+      </div>
+
+      <div class="relative">
+        <input type="password" id="confirmPassword" placeholder="Confirmar Contraseña" required
+          class="w-full border border-gray-300 px-4 py-2 pr-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <span onclick="togglePassword(this, 'confirmPassword')" class="absolute right-3 top-2.5 cursor-pointer text-gray-500">👁️</span>
+      </div>
+
+      <button type="submit"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-md transition">
+        Registrar
+      </button>
+      <div class="text-red-600 text-sm text-center" id="errorMsg"></div>
+      <div class="login-link">
+        ¿Ya tienes una cuenta?
+        <a href="login.html">Inicia sesión aquí</a>
+      </div>
+
+    </form>
+  </div>
+
+  <script>
+    function togglePassword(element, inputId) {
+      const input = document.getElementById(inputId);
+      const isVisible = input.type === "text";
+      input.type = isVisible ? "password" : "text";
+      element.textContent = isVisible ? "👁️" : "🙈";
+    }
+
+    document.getElementById('nombre').addEventListener('keypress', (e) => {
+      if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]$/.test(e.key)) e.preventDefault();
+    });
+    document.getElementById('apellido').addEventListener('keypress', (e) => {
+      if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]$/.test(e.key)) e.preventDefault();
+    });
+
+    const form = document.getElementById('registroForm');
+    const errorMsg = document.getElementById('errorMsg');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorMsg.textContent = '';
+
+      const nombre = form.nombre.value.trim();
+      const apellido = form.apellido.value.trim();
+      const email = form.email.value.trim();
+      const password = form.password.value;
+      const confirmPassword = form.confirmPassword.value;
+
+      if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]{1,20}$/.test(nombre)) {
+        return errorMsg.textContent = "❌ El nombre solo debe contener letras (máx 20).";
+      }
+      if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]{1,20}$/.test(apellido)) {
+        return errorMsg.textContent = "❌ El apellido solo debe contener letras (máx 20).";
+      }
+      if (!/^[\w.-]+@[a-zA-Z\d.-]+\.(co|com)$/.test(email)) {
+        return errorMsg.textContent = "❌ El correo debe terminar en .co o .com";
+      }
+      if (!/^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+]).{10,}$/.test(password)) {
+        return errorMsg.textContent = "❌ La contraseña debe tener al menos 10 caracteres, incluyendo letras, números y un carácter especial.";
+      }
+      if (password !== confirmPassword) {
+        return errorMsg.textContent = "❌ Las contraseñas no coinciden.";
+      }
+
+      try {
+        const res = await fetch('http://localhost:3000/api/usuarios/registro', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, apellido, email, password })
+        });
+
+        const result = await res.json();
+        if (res.ok) {
+          alert('✅ Usuario registrado con éxito');
+          window.location.href = 'login.html'; // Redirige al login
+        } else {
+          errorMsg.textContent = result.error || '❌ Error en el registro';
+        }
+      } catch (error) {
+        errorMsg.textContent = '❌ Error al conectar con el servidor.';
+      }
+    });
+  </script>
+</body>
+</html>

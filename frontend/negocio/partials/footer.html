@@ -1,0 +1,11 @@
+<!-- partials/footer.html -->
+<footer class="bg-white border-top py-3 mt-auto">
+  <div class="container-fluid px-3 text-secondary small d-flex justify-content-between">
+    <span>© <span id="yearSpan"></span> Tu Negocio</span>
+    <span>Hecho con ❤️</span>
+  </div>
+</footer>
+<script>
+  // año dinámico del footer sin contaminar el JS principal
+  document.getElementById('yearSpan').textContent = new Date().getFullYear();
+</script>

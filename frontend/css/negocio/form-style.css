@@ -1,0 +1,149 @@
+/* =======================================================
+   Estilos propios (sobre Bootstrap) para Login / Registro
+   ======================================================= */
+
+/* Fondo general */
+html, body {
+  height: 100%;
+}
+body {
+  background: #f3f4f6; /* Gris suave */
+}
+
+/* Contenedor/card del formulario */
+.login-card {
+  max-width: 480px;           /* Ancho cómodo en desktop */
+}
+
+/* Tarjeta (si quieres refinar el look por encima del card Bootstrap) */
+.card.rounded-4 {
+  border: 1px solid #e5e7eb;  /* Borde sutil */
+  box-shadow: 0 10px 30px rgba(0,0,0,.08);
+}
+
+/* Logo del negocio */
+.negocio-logo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 1rem;
+}
+
+/* Título y subtítulo */
+#nombreNegocio {
+  letter-spacing: .2px;
+}
+.text-secondary {
+  color: #6b7280 !important;  /* Gris medio (override sutil) */
+}
+
+/* Mensajes de alerta */
+#msg {
+  margin-top: .25rem;
+}
+
+/* ----- Inputs (floating labels) ----- */
+/* Bordes un poco más suaves y foco destacado */
+.form-control {
+  border-radius: .75rem;       /* redondeo suave */
+  border-color: #d1d5db;
+}
+.form-control:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 .25rem rgba(37,99,235,.15);
+}
+
+/* Input-group del password */
+.input-group .btn {
+  border-color: #d1d5db;
+}
+.input-group .btn:hover {
+  background: #f8f9fa;
+}
+.input-group .form-control {
+  border-right: 0;             /* integra con el botón del ojo */
+}
+.input-group .btn {
+  border-left: 0;
+}
+
+/* ----- Botón principal ----- */
+.btn-primary {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+.btn-primary:disabled {
+  opacity: .85;
+}
+
+/* Spinner dentro del botón (Bootstrap ya lo trae, solo detalle de espacio) */
+.btn .spinner-border {
+  margin-right: .5rem;
+}
+
+/* Links debajo del formulario (login <-> registro) */
+.auth-link,
+#linkRegistro,
+#linkLogin {
+  text-decoration: none;
+}
+.auth-link:hover,
+#linkRegistro:hover,
+#linkLogin:hover {
+  text-decoration: underline;
+}
+
+/* Separación del bloque “¿No tienes cuenta?” */
+.card .mt-3 {
+  margin-top: 1rem !important;
+}
+
+/* ---- Responsive tweaks ---- */
+@media (max-width: 420px) {
+  .card-body {
+    padding: 1.25rem !important;
+  }
+  .negocio-logo {
+    width: 120px;
+    height: 120px;
+  }
+}
+
+/* ---- Modo oscuro (opcional si el usuario lo prefiere) ---- */
+@media (prefers-color-scheme: dark) {
+  body { background: #0b1220; }
+  .card.rounded-4 {
+    border-color: #1f2937;
+    background: #0f172a;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .text-secondary { color: #94a3b8 !important; }
+  .form-control {
+    background: #0b1020;
+    color: #e5e7eb;
+    border-color: #374151;
+  }
+  .form-control::placeholder { color: #9ca3af; }
+  .form-control:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 .25rem rgba(59,130,246,.2);
+  }
+  .input-group .btn {
+    border-color: #374151;
+    color: #e5e7eb;
+    background: #0b1020;
+  }
+  .negocio-logo {
+    background: #0b1020;
+    border-color: #1f2937;
+  }
+}
+
+

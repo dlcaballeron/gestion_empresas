@@ -1,0 +1,180 @@
+/* ========================== */
+/* 🔹 Título principal centrado */
+/* ========================== */
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.main-content h2 {
+  text-align: center;
+  font-size: 28px;
+  font-weight: bold;
+  margin: 40px 0 20px;
+}
+
+/* ========================== */
+/* 🔹 Tabla general */
+/* ========================== */
+.table {
+  width: 100%;
+  font-size: 14px;
+  table-layout: auto;
+  border-collapse: collapse;
+}
+
+/* Fijar cabecera de la tabla */
+.table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #343a40;
+  color: white;
+  z-index: 2;
+  text-align: center;
+}
+
+/* Filas alternadas */
+.table tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* ========================== */
+/* 🔹 Columna Descripción */
+/* ========================== */
+.table td:nth-child(5),
+.table th:nth-child(5) {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ========================== */
+/* 🔹 Logo (imagen) */
+/* ========================== */
+.table img {
+  width: 40px;
+  height: auto;
+  border-radius: 4px;
+}
+
+/* ========================== */
+/* 🔹 Botones */
+/* ========================== */
+.btn-modificar,
+.btn-estado {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.btn-modificar {
+  background-color: #ffc107; /* amarillo */
+  color: #000;
+}
+
+.btn-estado {
+  background-color: #6c757d; /* gris oscuro */
+  color: #fff;
+}
+
+.btn-actualizar {
+  background-color: #17a2b8 !important; /* azul */
+  color: white !important;
+}
+
+/* ========================== */
+/* 🔹 Input y checkbox dentro de tabla */
+/* ========================== */
+.table td input[type="text"],
+.table td textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #ccc;
+  padding: 4px;
+  border-radius: 3px;
+}
+
+.table td input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
+/* ========================== */
+/* 🔹 Contenedor tabla con scroll y centrado */
+/* ========================== */
+.table-responsive {
+  max-height: 600px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin: 0 auto;
+}
+
+/* ========================== */
+/* 🔹 Filtros de búsqueda */
+/* ========================== */
+.filtros-container {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 20px;
+  margin: 20px auto;
+  border-radius: 8px;
+  max-width: 1200px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Etiquetas e inputs de filtro */
+.filtros-container label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.filtros-container input[type="text"],
+.filtros-container input[type="date"],
+.filtros-container select {
+  width: 100%;
+  max-width: 300px;
+  padding: 6px;
+  margin-bottom: 15px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+/* Distribución de filtros en fila */
+.filtros-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-end;
+}
+
+/* Botones de filtros */
+.filtros-container button {
+  padding: 8px 16px;
+  margin-top: 8px;
+  margin-right: 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.filtros-container button#btn-aplicar {
+  background-color: #007bff;
+  color: white;
+}
+
+.filtros-container button#btn-limpiar {
+  background-color: #f8f9fa;
+  color: #333;
+  border: 1px solid #ccc;
+}

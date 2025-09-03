@@ -1,0 +1,171 @@
+.main-content {
+  margin-left: 220px; /* espacio para el sidebar */
+  padding: 40px 20px;
+  padding-top: 40px;  /* ✅ margen superior para evitar que el formulario se suba al header */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* ✅ evita que se centre verticalmente */
+  min-height: 100vh;
+  box-sizing: border-box;
+  background-color: #f5f5f5;
+}
+
+
+/* Contenedor del formulario */
+.form-container {
+  background-color: white;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  max-width: 90%;
+  width: 100%;
+  margin-top: 20px; /* ✅ separación respecto al header */
+}
+
+/* Título del formulario */
+.form-container h2 {
+  text-align: center;
+  font-weight: 700;
+  margin-bottom: 30px;
+  color: #333;
+  font-size: 24px;
+}
+
+/* Etiquetas */
+label,
+.form-label {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #222;
+  display: block;
+}
+
+/* Inputs y textarea */
+input[type="text"],
+input[type="number"],
+input[type="file"],
+textarea,
+select {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+  transition: border-color 0.3s;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #007bff;
+  outline: none;
+}
+
+/* Textarea */
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Checkbox */
+.form-check-label {
+  font-weight: 500;
+  margin-left: 8px;
+  color: #333;
+  display: inline-block;
+  margin-bottom: 15px;
+}
+
+/* Contenedor de botones */
+.botones {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+/* Botones base */
+.btn {
+  padding: 12px 24px;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: background-color 0.3s, transform 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+/* Botón Crear */
+.btn-crear {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-crear:hover {
+  background-color: #218838;
+}
+
+/* Botón Cancelar */
+.btn-cancelar {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-cancelar:hover {
+  background-color: #c82333;
+}
+
+/* Botón Actualizar */
+.btn-actualizar {
+  background-color: #ffc107;
+  color: #212529;
+}
+
+.btn-actualizar:hover {
+  background-color: #e0a800;
+}
+
+/* Campo de URL pública */
+#url_publica {
+  margin-top: 10px;
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  box-sizing: border-box;
+}
+
+/* Botón copiar */
+.btn-copiar {
+  background-color: #007bff;
+  color: white;
+  margin-top: 10px;
+  padding: 10px 16px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-copiar:hover {
+  background-color: #0056b3;
+}
+
+/* 🧱 Responsividad */
+@media (max-width: 768px) {
+  .form-container {
+    padding: 25px;
+    max-width: 100%;
+  }
+
+  .botones {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}
