@@ -1,20 +1,20 @@
 // frontend/negocio/js/modules/products.js
-// CRUD de productos basados en imagen + recargos por ítems (categorías rol='atributo')
+// Admin de productos (CRUD) — SIN precios por atributo (los recargos son globales por negocio)
 
 import { state } from './state.js';
 import { loadProductosActivos } from './api.js';
 
 let NEGOCIO_ID = null;
 let ON_CHANGE  = null;
-let PRODUCTS   = [];     // cache listado
-let IMAGENES   = [];     // cache para el selector de imágenes
+let PRODUCTS   = [];   // cache listado
+let IMAGENES   = [];   // cache para selector de imágenes
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
-/* ================================
- * PÚBLICO: inicializar la sección
- * ================================ */
+/* ==============================
+ * INIT público del módulo
+ * ============================== */
 export async function initProductosAdmin(negocio, opts = {}) {
   NEGOCIO_ID = Number(negocio?.id || 0);
   if (!NEGOCIO_ID) return;
@@ -64,7 +64,7 @@ export async function initProductosAdmin(negocio, opts = {}) {
 }
 
 /* =========================
- * Carga & render del grid
+ * Cargar & pintar el grid
  * ========================= */
 async function reloadProductos() {
   const wrap = $('#productosTableWrap');
@@ -173,7 +173,7 @@ function renderTable(items) {
 }
 
 /* ================
- * Form modal CRUD
+ * Modal CRUD
  * ================ */
 function ensureFormModal() {
   let modal = $('#productoFormModal');
@@ -232,14 +232,10 @@ function ensureFormModal() {
               </div>
             </div>
 
-            <div class="mt-3">
-              <h6 class="mb-2">Atributos y recargos</h6>
-              <div class="small text-secondary mb-2">
-                Solo se listan categorías <strong>rol="atributo"</strong> activas. Deja vacío para no aplicar recargo.
-              </div>
-              <div id="precioAtributosWrap" class="border rounded p-2" style="max-height:280px;overflow:auto">
-                <!-- render dinámico -->
-              </div>
+            <div class="alert alert-light border mt-3 mb-0">
+              <i class="bi bi-info-circle me-1"></i>
+              Los <b>recargos por atributo</b> se definen de forma <b>global</b> en
+              <em>“Precios de atributos”</em>. Este producto <b>no</b> guarda recargos propios.
             </div>
           </div>
 
@@ -299,11 +295,6 @@ function openForm(product = null) {
   const modalEl = ensureFormModal();
   fillForm(product);
 
-  // Render editor de atributos+precios
-  buildAttrPriceEditor(product?.id || null).catch(() => {
-    $('#precioAtributosWrap').innerHTML = `<div class="text-danger small">No se pudieron cargar los atributos.</div>`;
-  });
-
   const form = $('#productoForm', modalEl);
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -314,17 +305,15 @@ function openForm(product = null) {
       return;
     }
 
-    const opciones = collectAttrPrices(); // [{categoria_id,item_id,precio}]
-
     try {
       $('#btnSavePrd').disabled = true;
 
-      // 1) crear/actualizar producto
-      let url   = `/api/negocios/${NEGOCIO_ID}/productos`;
-      let method= 'POST';
+      // crear/actualizar producto
+      let url    = `/api/negocios/${NEGOCIO_ID}/productos`;
+      let method = 'POST';
       if (id) { url += `/${id}`; method = 'PUT'; }
 
-      const res = await fetch(url, {
+      const res  = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -332,18 +321,6 @@ function openForm(product = null) {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'No se pudo guardar el producto');
 
-      const prdId = id || Number(data.id);
-
-      // 2) upsert de recargos por ítem
-      const r2 = await fetch(`/api/negocios/${NEGOCIO_ID}/productos/${prdId}/opciones`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ opciones }),
-      });
-      const j = await r2.json().catch(() => ({}));
-      if (!r2.ok) throw new Error(j.error || 'No se pudieron guardar las opciones');
-
-      // refrescos
       await reloadProductos();
       await refreshMarketplace();
 
@@ -357,67 +334,6 @@ function openForm(product = null) {
 
   const BS = window.bootstrap;
   new BS.Modal(modalEl).show();
-}
-
-/* ===================================================
- * Editor de Atributos+Precios (categorías con ítems)
- * =================================================== */
-async function buildAttrPriceEditor(productId = null) {
-  const wrap = $('#precioAtributosWrap'); if (!wrap) return;
-
-  // 1) árbol desde state (precargado en principal.js)
-  const tree = Array.isArray(state.categoriasTree) ? state.categoriasTree : [];
-
-  // 2) si estoy editando, traigo opciones previas
-  const existing = productId ? await fetchProductoOpciones(productId) : [];
-  const priceMap = new Map(existing.map(o => [`${o.categoria_id}:${o.item_id}`, Number(o.precio || 0)]));
-
-  // 3) pinto (solo rol atributo y activos)
-  const grupos = tree
-    .filter(c => String(c.rol) === 'atributo' && Number(c.estado) === 1)
-    .map(c => {
-      const items = (c.items || []).filter(it => Number(it.estado) === 1);
-      const lis = items.map(it => {
-        const key = `${c.id}:${it.id}`;
-        const val = priceMap.has(key) ? priceMap.get(key) : '';
-        return `
-          <div class="d-flex align-items-center mb-1">
-            <div class="me-2" style="min-width:140px">${escapeHTML(it.label || it.nombre || '')}</div>
-            <div class="input-group input-group-sm" style="max-width:160px">
-              <span class="input-group-text">$</span>
-              <input type="number" class="form-control attr-price" step="0.01" min="0"
-                     data-cat="${c.id}" data-item="${it.id}" placeholder="0.00"
-                     value="${val === '' ? '' : String(val)}">
-            </div>
-          </div>`;
-      }).join('') || `<div class="text-secondary small">— sin ítems —</div>`;
-
-      return `
-        <div class="mb-2">
-          <div class="fw-semibold mb-1">${escapeHTML(c.nombre)}</div>
-          ${lis}
-        </div>`;
-    }).join('');
-
-  wrap.innerHTML = grupos || `<div class="text-secondary small">No hay categorías de atributos activas.</div>`;
-}
-
-function collectAttrPrices() {
-  const inputs = $$('.attr-price');
-  const out = [];
-  for (const inp of inputs) {
-    const raw = String(inp.value || '').trim();
-    if (raw === '') continue; // vacío → no guardar
-    const v = parseFloat(raw);
-    if (Number.isFinite(v) && v >= 0) {
-      out.push({
-        categoria_id: Number(inp.dataset.cat),
-        item_id: Number(inp.dataset.item),
-        precio: v,
-      });
-    }
-  }
-  return out;
 }
 
 /* ======================
@@ -499,7 +415,6 @@ function ensureImagenPicker() {
 async function loadImagenesIfNeeded() {
   if (IMAGENES.length) return;
   try {
-    // Usa tu endpoint real de imágenes. Si no tienes filtros, quita params.
     const r = await fetch(`/api/negocios/${NEGOCIO_ID}/imagenes`);
     if (!r.ok) throw new Error();
     const j = await r.json().catch(() => []);
@@ -513,10 +428,8 @@ async function setPreviewFromImagenId(imagenId) {
   const imgPrev = $('#prdImgPreview');
   if (!imagenId) { imgPrev.style.display = 'none'; return; }
 
-  // Busca en cache
   let info = IMAGENES.find(i => Number(i.id) === Number(imagenId));
   if (!info) {
-    // intenta endpoint de detalle si existe
     try {
       const r = await fetch(`/api/negocios/${NEGOCIO_ID}/imagenes/${imagenId}`);
       if (r.ok) info = await r.json();
@@ -550,6 +463,7 @@ async function toggleEstado(id, estado) {
       body: JSON.stringify({ estado }),
     });
     if (!res.ok) {
+      // fallback por compatibilidad
       const res2 = await fetch(`/api/negocios/${NEGOCIO_ID}/productos/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -565,26 +479,27 @@ async function toggleEstado(id, estado) {
 }
 
 /* =====================
- * Auxiliares y refresh
+ * Refresh marketplace
  * ===================== */
 async function refreshMarketplace() {
   try {
+    // Si tu UI guarda seleccionados en state.filtro.selectedItemIds, respétalo (pero no envíes vacío)
+    const items = Array.isArray(state.filtro?.selectedItemIds)
+      ? state.filtro.selectedItemIds.map(Number).filter(Number.isFinite)
+      : [];
+
     await loadProductosActivos({
-      q: state.filtro.q || '',
-      categoriaId: state.filtro.filtroCategoriaId ?? null,
+      q: state.filtro?.q || '',
+      categoriaId: state.filtro?.filtroCategoriaId ?? null,
       page: 1,
       size: 200,
+      ...(items.length ? { items } : {}),
     });
     state.pag.page = 1;
     if (ON_CHANGE) await ON_CHANGE();
-  } catch {}
-}
-
-async function fetchProductoOpciones(productId) {
-  const r = await fetch(`/api/negocios/${NEGOCIO_ID}/productos/${productId}/opciones`);
-  if (!r.ok) return [];
-  const j = await r.json().catch(() => []);
-  return Array.isArray(j) ? j : [];
+  } catch {
+    /* noop */
+  }
 }
 
 /* =============

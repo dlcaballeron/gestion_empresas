@@ -61,13 +61,15 @@ export function cldFill(url, {
 }
 
 // Helpers de producto: obtiene solo categorías de atributo con ítems
-export function getAttrCats(p) {
-  return (p.categorias || [])
-    .filter(c => String(c.rol) !== 'filtro')
+export function getAttrCats(prod) {
+  return (prod?.categorias || [])
+    .filter(c => String(c?.rol || '').toLowerCase() === 'atributo')
     .map(c => ({
-      id: Number(c.id),
-      nombre: c.nombre,
-      items: (c.items || []).map(i => ({ id: Number(i.id), label: i.label }))
-    }))
-    .filter(c => c.items.length > 0);
+      ...c,
+      items: (c.items || []).map(it => ({
+        id: Number(it.id),
+        label: it.label ?? it.nombre ?? String(it.id),
+        recargo: Number(it.recargo ?? it.precio ?? it.price ?? 0)
+      }))
+    }));
 }

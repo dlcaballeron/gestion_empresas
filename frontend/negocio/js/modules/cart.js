@@ -1,6 +1,9 @@
-// modules/cart.js
+// frontend/negocio/js/modules/cart.js
+// Lateral de carrito con precio unitario y subtotal por ítem.
+
 import { state } from './state.js';
 import { $, warnToast, getAttrCats } from './utils.js';
+import { computeUnitPrice, fmtCOP } from './attr-prices.js';
 
 function storageKey() { return `cart:${state.slug || 'negocio'}`; }
 
@@ -13,7 +16,14 @@ export function loadCartFromStorage() {
   } catch {
     state.cart = [];
   }
+  // Normaliza campos de precio para carros viejos
+  for (const it of state.cart) {
+    it.precio_unit = Number(it.precio_unit ?? it.precio ?? 0);
+    it.qty = Math.max(1, Number(it.qty || 1));
+    it.subtotal = Number(it.precio_unit) * Number(it.qty);
+  }
   renderCartOffcanvas();
+  updateCartBadge();
 }
 
 function saveCartToStorage() {
@@ -31,7 +41,11 @@ export function clearCart() {
  * Cálculos / UI
  * ========================================================= */
 function cartTotalQty() {
-  return state.cart.reduce((acc, it) => acc + Number(it.qty || 0), 0);
+  return (state.cart || []).reduce((acc, it) => acc + Number(it.qty || 0), 0);
+}
+
+function cartTotalMoney() {
+  return (state.cart || []).reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
 }
 
 export function updateCartBadge() {
@@ -59,6 +73,12 @@ export function ensureCartUI() {
       </div>
       <div class="offcanvas-body d-flex flex-column">
         <div id="cartItemsHost" class="flex-grow-1"></div>
+
+        <div class="mt-2 d-flex justify-content-between align-items-center">
+          <div class="fw-semibold">Total</div>
+          <div id="cartTotalValue" class="fw-bold"></div>
+        </div>
+
         <div class="border-top pt-3 d-flex justify-content-between">
           <button id="btnEmptyCart" class="btn btn-outline-danger btn-sm">
             <i class="bi bi-trash"></i> Vaciar
@@ -77,12 +97,16 @@ export function ensureCartUI() {
 
       if (btnInc) {
         const idx = Number(btnInc.dataset.cartInc);
-        state.cart[idx].qty += 1;
+        const it = state.cart[idx]; if (!it) return;
+        it.qty = Math.max(1, Number(it.qty || 1) + 1);
+        it.subtotal = Number(it.precio_unit || 0) * Number(it.qty);
         saveCartToStorage(); renderCartOffcanvas(); updateCartBadge();
       }
       if (btnDec) {
         const idx = Number(btnDec.dataset.cartDec);
-        state.cart[idx].qty = Math.max(1, state.cart[idx].qty - 1);
+        const it = state.cart[idx]; if (!it) return;
+        it.qty = Math.max(1, Number(it.qty || 1) - 1);
+        it.subtotal = Number(it.precio_unit || 0) * Number(it.qty);
         saveCartToStorage(); renderCartOffcanvas(); updateCartBadge();
       }
       if (btnDel) {
@@ -150,6 +174,7 @@ export function renderCartOffcanvas() {
   if (!state.cart.length) {
     host.innerHTML = `<div class="text-secondary small">Tu carrito está vacío.</div>`;
     $('#btnCartContinue')?.setAttribute('disabled', 'disabled');
+    const tv = $('#cartTotalValue'); if (tv) tv.textContent = fmtCOP(0);
     return;
   }
   $('#btnCartContinue')?.removeAttribute('disabled');
@@ -158,14 +183,29 @@ export function renderCartOffcanvas() {
     const sels = (row.selections || [])
       .map(s => `<span class="badge bg-info text-dark me-1 mb-1">${s.catNombre}: ${s.itemLabel}</span>`)
       .join(' ');
+
+    const unit = Number(row.precio_unit || 0);
+    const sub  = Number(row.subtotal || (unit * Number(row.qty || 1)));
+
     return `
       <div class="card mb-2">
         <div class="card-body d-flex gap-2 align-items-start">
           <img src="${row.imagen}" style="width:56px;height:56px;object-fit:cover;border-radius:.5rem;border:1px solid #eee">
           <div class="flex-grow-1">
-            <div class="fw-semibold">${row.nombre}</div>
-            <div class="small text-secondary">ID #${row.pid}</div>
-            ${sels ? `<div class="mt-1">${sels}</div>` : ''}
+            <div class="d-flex justify-content-between">
+              <div>
+                <div class="fw-semibold">${row.nombre}</div>
+                <div class="small text-secondary">ID #${row.pid}</div>
+                ${sels ? `<div class="mt-1">${sels}</div>` : ''}
+              </div>
+              <div class="text-end">
+                <div class="small text-secondary">Precio unit.</div>
+                <div class="fw-semibold">${fmtCOP(unit)}</div>
+                <div class="small text-secondary mt-1">Subtotal</div>
+                <div class="fw-bold">${fmtCOP(sub)}</div>
+              </div>
+            </div>
+
             <div class="d-flex align-items-center gap-2 mt-2">
               <button class="btn btn-sm btn-outline-secondary" data-cart-dec="${idx}">–</button>
               <span>${row.qty}</span>
@@ -178,6 +218,9 @@ export function renderCartOffcanvas() {
         </div>
       </div>`;
   }).join('');
+
+  const tv = $('#cartTotalValue');
+  if (tv) tv.textContent = fmtCOP(cartTotalMoney());
 }
 
 /* =========================================================
@@ -202,7 +245,12 @@ export function openAddToCartModal(p, preSelMap = new Map()) {
     btnConfirm.disabled = false;
     btnConfirm.onclick = () => {
       const qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
-      addToCart({ pid: p.id, nombre: p.nombre, imagen: p.imagen, qty, selections: [] });
+      // precio unitario = base_precio del producto
+      const precio_unit = Number(p.base_precio ?? p.base ?? p.precio ?? 0);
+      addToCart({
+        pid: p.id, nombre: p.nombre, imagen: p.imagen,
+        qty, selections: [], precio_unit,
+      });
       BS.Modal.getInstance($('#addToCartModal'))?.hide();
       openCartOffcanvas();
     };
@@ -224,7 +272,12 @@ export function openAddToCartModal(p, preSelMap = new Map()) {
         catId, catNombre: v.catNombre ?? (attrCats.find(c => c.id === catId)?.nombre || ''),
         itemId: v.itemId, itemLabel: v.itemLabel
       }));
-      addToCart({ pid: p.id, nombre: p.nombre, imagen: p.imagen, qty, selections });
+      const precio_unit = Number(computeUnitPrice(p, preSelMap) ?? 0);
+      if (!Number.isFinite(precio_unit) || precio_unit <= 0) {
+        warnToast?.('No se pudo calcular el precio del producto.');
+        return;
+      }
+      addToCart({ pid: p.id, nombre: p.nombre, imagen: p.imagen, qty, selections, precio_unit });
       BS.Modal.getInstance($('#addToCartModal'))?.hide();
       openCartOffcanvas();
     };
@@ -271,8 +324,13 @@ export function openAddToCartModal(p, preSelMap = new Map()) {
     const selections = [...selected.entries()].map(([catId, v]) => ({
       catId, catNombre: v.catNombre ?? '', itemId: v.itemId, itemLabel: v.itemLabel
     }));
-    addToCart({ pid: p.id, nombre: p.nombre, imagen: p.imagen, qty, selections });
-    state.preselect.set(p.id, new Map(selected));
+    const precio_unit = Number(computeUnitPrice(p, selected) ?? 0);
+    if (!Number.isFinite(precio_unit) || precio_unit <= 0) {
+      warnToast?.('No se pudo calcular el precio del producto.');
+      return;
+    }
+    addToCart({ pid: p.id, nombre: p.nombre, imagen: p.imagen, qty, selections, precio_unit });
+    state.preselect.set(p.id, new Map(selected)); // persistimos selección en la tarjeta
     const BS = window.bootstrap;
     BS.Modal.getInstance($('#addToCartModal'))?.hide();
     openCartOffcanvas();
@@ -294,8 +352,19 @@ export function addToCart(row) {
   const k = keyOf(row);
   const found = state.cart.find(it => keyOf(it) === k);
 
-  if (found) { found.qty += row.qty; }
-  else { state.cart.push({ ...row }); }
+  if (found) {
+    found.qty = Math.max(1, Number(found.qty || 1) + Number(row.qty || 1));
+    // precio_unit debe ser el mismo si la selección es la misma
+    found.precio_unit = Number(found.precio_unit ?? row.precio_unit ?? 0);
+    found.subtotal = Number(found.precio_unit || 0) * Number(found.qty || 1);
+  } else {
+    const precio_unit = Number(row.precio_unit ?? 0);
+    state.cart.push({
+      ...row,
+      precio_unit,
+      subtotal: precio_unit * Number(row.qty || 1),
+    });
+  }
 
   saveCartToStorage();
   updateCartBadge();
@@ -305,14 +374,15 @@ export function addToCart(row) {
 /**
  * Mapea el contenido del carrito al formato esperado por el checkout/backend
  * [{ producto_id, imagen_id, nombre, precio, cantidad, variante, img_url }]
- * Nota: por ahora no manejamos precio aquí; déjalo en 0 o súbelo desde el catálogo.
+ * OJO: el backend inserta 'precio' en la columna 'precio_unit', por eso
+ * aquí enviamos el precio **unitario** en 'precio'.
  */
 export function getCartForCheckout() {
   return (state.cart || []).map(r => ({
     producto_id: null,            // cuando exista tabla productos
     imagen_id: r.pid,             // tu id de imagen
     nombre: r.nombre,
-    precio: Number(r.precio || 0),
+    precio: Number(r.precio_unit || 0),        // unitario
     cantidad: Number(r.qty || 1),
     variante: (r.selections || []).map(s => ({ categoria: s.catNombre, item: s.itemLabel })), // JSON
     img_url: r.imagen || null

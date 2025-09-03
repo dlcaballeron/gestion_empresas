@@ -3,6 +3,7 @@
 // ===== Imports para el módulo de productos =====
 import { initProductosAdmin } from './modules/products.js';
 import { state } from './modules/state.js';
+import { openAttrPricesModal } from './modules/attr-prices.js';
 
 // Estado global del módulo (solo para este archivo)
 let NEGOCIO_ID = null;
@@ -21,6 +22,9 @@ export async function initAdminPanel(negocio) {
   // ——— Título/encabezado del panel ———
   const info = $('#adminNegocioInfo');
   if (info) info.textContent = `${negocio.razon_social || 'Negocio'} · ID ${NEGOCIO_ID}`;
+
+  // ——— Acciones rápidas (inyecta el botón de "Precios de atributos") ———
+  ensureTopActions();
 
   // ——— Previews iniciales de logo y portada ———
   let logoURL  = negocio.logo || '';
@@ -410,8 +414,33 @@ async function ensureCategoriasTree() {
   }
 }
 
-/* ------------------------- Utils ------------------------- */
+/* ------------------------- Quick actions ------------------------- */
+function ensureTopActions() {
+  const body = $('#adminPanel .offcanvas-body');
+  if (!body) return;
 
+  let wrap = $('#adminQuickActions', body);
+  if (!wrap) {
+    wrap = document.createElement('div');
+    wrap.id = 'adminQuickActions';
+    wrap.className = 'mb-3';
+    // lo insertamos al inicio del panel
+    body.insertBefore(wrap, body.firstChild);
+  }
+
+  // Botón: Precios de atributos
+  if (!$('#btnAttrPrices', wrap)) {
+    const btn = document.createElement('button');
+    btn.id = 'btnAttrPrices';
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-outline-secondary w-100 text-start';
+    btn.innerHTML = `<i class="bi bi-cash-coin me-1"></i> Precios de atributos`;
+    wrap.appendChild(btn);
+    btn.addEventListener('click', () => openAttrPricesModal({ negocioId: NEGOCIO_ID }));
+  }
+}
+
+/* ------------------------- Utils ------------------------- */
 function safeCloudinaryThumb(url, w = 400, h = 300) {
   try {
     if (!url) return `https://via.placeholder.com/${w}x${h}?text=%E2%80%94`;

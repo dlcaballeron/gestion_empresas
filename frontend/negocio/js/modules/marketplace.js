@@ -1,6 +1,6 @@
 // frontend/negocio/js/modules/marketplace.js
 import { state } from './state.js';
-import { $, $$, cldFill, warnToast, getAttrCats } from './utils.js';
+import { $, $$, cldFill, warnToast } from './utils.js';
 import {
   loadFiltroCategorias,
   preloadCategoriasTree,
@@ -10,11 +10,82 @@ import {
 import { openAddToCartModal } from './cart.js';
 
 /* =========================================================
+ * Helpers para precio condicional (según selección)
+ * ========================================================= */
+
+const getAttrCats = (prod) =>
+  (prod?.categorias || []).filter(
+    (c) => String(c?.rol || '').toLowerCase() === 'atributo'
+  );
+
+// Devuelve true si el producto tiene TODAS sus categorías de atributo con un item elegido.
+function isSelectionComplete(prodId, prod) {
+  const cats = getAttrCats(prod) || [];
+  if (cats.length === 0) return true; // sin atributos → considerar completo (muestra base)
+  const sel = state.preselect.get(prodId) || new Map();
+  for (const c of cats) {
+    if (!sel.has(Number(c.id))) return false;
+  }
+  return true;
+}
+
+// Calcula el total = base + suma de recargos de items seleccionados.
+// Si la selección no está completa, devuelve null (para pintar “Selecciona atributos”).
+function computeSelectedTotal(prodId, prod) {
+  if (!isSelectionComplete(prodId, prod)) return null;
+
+  // Fuente del base: siempre prioriza base_precio del backend
+  const base = Number(
+    prod.base_precio ?? prod.base ?? prod.precio ?? 0
+  );
+
+  const sel  = state.preselect.get(prodId) || new Map();
+  const cats = getAttrCats(prod) || [];
+
+  let total = base;
+  for (const c of cats) {
+    const chosen = sel.get(Number(c.id));
+    if (!chosen) continue;
+    const itemId = Number(chosen.itemId ?? chosen.id ?? chosen);
+    const it = (c.items || []).find(x => Number(x.id) === itemId);
+    if (it) total += Number(it.recargo || 0);
+  }
+  return total;
+}
+
+function fmtCOP(n) {
+  return new Intl.NumberFormat('es-CO', {
+    style: 'currency', currency: 'COP', maximumFractionDigits: 0
+  }).format(Math.round(Number(n || 0)));
+}
+
+// Pinta el precio condicional dentro de la tarjeta y habilita/deshabilita “Añadir”.
+function renderCardPrice(cardEl, prod) {
+  const priceEl = cardEl.querySelector('.js-price');
+  if (!priceEl) return;
+
+  const total = computeSelectedTotal(prod.id, prod);
+  if (total == null) {
+    priceEl.innerHTML = `<span class="text-secondary">Selecciona atributos</span>`;
+  } else {
+    priceEl.textContent = fmtCOP(total);
+  }
+
+  const addBtn = cardEl.querySelector('[data-add]');
+  if (addBtn) addBtn.disabled = (total == null) || !prod.stock;
+}
+
+/* =========================================================
  * Normalización (del feed de /marketplace → state.productos)
  * ========================================================= */
 function normalizeFromMarketItems(items = []) {
-  // Backend: item = { id, nombre, descripcion, base_precio, imagen_url, imagen_id, filtros[], atributos[] }
-  // UI espera: p = { id, nombre, descripcion, imagen, precio, categorias: [ {id,nombre,rol='filtro'}, {id,nombre,rol='atributo', items:[{id,label,recargo}]} ] }
+  // Backend item: { id, nombre, descripcion, base_precio, precio_card, imagen_url, imagen_id, filtros[], atributos[] }
+  // UI espera: p = {
+  //   id, nombre, descripcion, imagen,
+  //   base_precio (precio base – fuente para la suma),
+  //   precio (compat),
+  //   categorias: [ {id,nombre,rol='filtro'}, {id,nombre,rol='atributo', items:[{id,label,recargo}]} ]
+  // }
   return items.map((it) => {
     // 1) filtros (chips grises)
     const filtroCats = (it.filtros || []).map(f => ({
@@ -26,29 +97,31 @@ function normalizeFromMarketItems(items = []) {
     // 2) atributos agrupados por categoría
     const grouped = new Map(); // catId -> { id, nombre, rol:'atributo', items:[] }
     (it.atributos || []).forEach(a => {
-      const catId = Number(a?.categoria?.id);
-      const catNm = String(a?.categoria?.nombre || '');
-      const itemId = Number(a?.item?.id);
-      const label  = String(a?.item?.label ?? a?.item?.nombre ?? itemId);
+      const catId   = Number(a?.categoria?.id);
+      const catNm   = String(a?.categoria?.nombre || '');
+      const itemId  = Number(a?.item?.id);
+      const label   = String(a?.item?.label ?? a?.item?.nombre ?? itemId);
       const recargo = Number(a?.recargo || 0);
-
       if (!catId || !itemId) return;
       if (!grouped.has(catId)) {
         grouped.set(catId, { id: catId, nombre: catNm, rol: 'atributo', items: [] });
       }
       grouped.get(catId).items.push({ id: itemId, label, recargo });
     });
-
     const attrCats = Array.from(grouped.values());
+
+    // base y compat
+    const base_precio = Number(it.base_precio ?? 0);
 
     return {
       id: Number(it.id),
       nombre: it.nombre || (it.imagen_titulo || 'Producto'),
       descripcion: it.descripcion || '',
       imagen: it.imagen_url || '',
-      precio: Number(it.base_precio || 0), // precio base mostrado en tarjeta
-      rating: Number(it.rating || 0),      // opcional
-      stock: it.stock ?? 1,                // opcional (true por defecto)
+      base_precio,            // <- usamos esto para sumar con recargos
+      precio: base_precio,    // compat: algunos flujos esperan p.precio
+      rating: Number(it.rating || 0),
+      stock: it.stock ?? 1,
       categorias: [...filtroCats, ...attrCats],
     };
   });
@@ -127,9 +200,12 @@ export function applyFilters() {
 
     const hayTexto = (p.nombre || '') + ' ' + (p.descripcion || '');
     const byQ    = !q || hayTexto.toLowerCase().includes(q);
-    const price  = Number(p.precio || 0);
-    const byMin  = f.minPrice == null || price >= f.minPrice;
-    const byMax  = f.maxPrice == null || price <= f.maxPrice;
+
+    // Para filtros min/max seguimos usando el base como referencia.
+    const base  = Number(p.base_precio ?? p.base ?? p.precio ?? 0);
+    const byMin = f.minPrice == null || base >= f.minPrice;
+    const byMax = f.maxPrice == null || base <= f.maxPrice;
+
     const byStk  = !f.inStock || !!p.stock;
     const byRate = (Number(p.rating || 0) >= (Number(f.minRating || 0)));
 
@@ -137,25 +213,23 @@ export function applyFilters() {
   });
 
   // Orden
+  const priceForSort = (x) => Number(x.base_precio ?? x.base ?? x.precio ?? 0);
   items.sort((a, b) => {
     switch (f.sortBy) {
-      case 'price_asc':   return (a.precio || 0) - (b.precio || 0);
-      case 'price_desc':  return (b.precio || 0) - (a.precio || 0);
+      case 'price_asc':   return priceForSort(a) - priceForSort(b);
+      case 'price_desc':  return priceForSort(b) - priceForSort(a);
       case 'rating_desc': return (Number(b.rating || 0)) - (Number(a.rating || 0));
       case 'newest':      return Number(b.id) - Number(a.id);
       default:            return 0;
     }
   });
 
-  // Total encontrados
   const totalEl = document.getElementById('totalFound');
   if (totalEl) totalEl.textContent = String(items.length);
 
-  // Paginación
   const end = (state.pag.size || 12) * (state.pag.page || 1);
   renderGrid(items.slice(0, end));
 
-  // Botón "Cargar más"
   const lm = document.getElementById('btnLoadMore');
   if (lm) lm.classList.toggle('d-none', end >= items.length);
 }
@@ -166,6 +240,11 @@ export function applyFilters() {
 export function renderGrid(items) {
   const grid = $('#grid');
   if (!grid) return;
+
+  // asegurar preselect como Map
+  if (!(state.preselect instanceof Map)) {
+    state.preselect = new Map();
+  }
 
   if (!items.length) {
     grid.classList.add('row', 'g-3');
@@ -213,13 +292,15 @@ export function renderGrid(items) {
         </div>`;
     }).join('');
 
-    const priceStr = Number.isFinite(Number(p.precio))
-      ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(p.precio))
-      : '';
+    // Precio: placeholder (se calcula/actualiza en runtime)
+    const pricePlaceholder = `<div class="fw-semibold small js-price"></div>`;
+
+    // Botón añadir (arranca deshabilitado; se habilita cuando selección completa)
+    const addDisabled = isSelectionComplete(p.id, p) ? '' : 'disabled';
 
     return `
       <div class="col-6 col-md-4 col-lg-3 col-xxl-2">
-        <div class="card product-card h-100">
+        <div class="card product-card h-100" data-card="${p.id}">
           <div class="thumb"><img src="${imgUrl}" alt="${p.nombre || 'Producto'}" loading="lazy"></div>
           <div class="card-body">
             <h6 class="card-title mb-1">${p.nombre || 'Producto'}</h6>
@@ -229,16 +310,23 @@ export function renderGrid(items) {
             </div>
             ${attrPillsHTML ? `<div class="mb-1">${attrPillsHTML}</div>` : ''}
             <div class="d-flex justify-content-between align-items-center">
-              <div class="fw-semibold small">${priceStr}</div>
+              ${pricePlaceholder}
               <div class="d-flex gap-2">
                 <button class="btn btn-sm btn-outline-primary" data-detalle="${p.id}">Ver</button>
-                <button class="btn btn-sm btn-primary" data-add="${p.id}" ${p.stock ? '' : 'disabled'}>Añadir</button>
+                <button class="btn btn-sm btn-primary" data-add="${p.id}" ${addDisabled}>Añadir</button>
               </div>
             </div>
           </div>
         </div>
       </div>`;
   }).join('');
+
+  // Pintar el precio condicional inicial y habilitar/deshabilitar "Añadir"
+  $$('#grid .product-card').forEach(card => {
+    const pid = Number(card.getAttribute('data-card'));
+    const p = (state.productos || []).find(x => x.id === pid);
+    if (p) renderCardPrice(card, p);
+  });
 
   // Acción: Detalle (modal simple)
   $$('#grid [data-detalle]').forEach((btn) => {
@@ -248,7 +336,7 @@ export function renderGrid(items) {
     });
   });
 
-  // Acción: Selección de píldoras de atributos
+  // Acción: Selección de píldoras de atributos (recalcula precio)
   $$('#grid .attr-pill').forEach((btn) => {
     btn.addEventListener('click', () => {
       const pid       = Number(btn.dataset.pid);
@@ -264,19 +352,23 @@ export function renderGrid(items) {
         state.preselect.set(pid, selMap);
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-outline-secondary');
-        return;
+      } else {
+        // Dejar uno solo activo por categoría
+        $(`#grid .attr-group[data-pid="${pid}"][data-cat="${catId}"]`)
+          ?.querySelectorAll('.attr-pill')
+          .forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-outline-secondary'); });
+
+        btn.classList.remove('btn-outline-secondary');
+        btn.classList.add('btn-primary');
+
+        selMap.set(catId, { itemId, itemLabel, catNombre });
+        state.preselect.set(pid, selMap);
       }
 
-      // Dejar uno solo activo por categoría
-      $(`#grid .attr-group[data-pid="${pid}"][data-cat="${catId}"]`)
-        ?.querySelectorAll('.attr-pill')
-        .forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-outline-secondary'); });
-
-      btn.classList.remove('btn-outline-secondary');
-      btn.classList.add('btn-primary');
-
-      selMap.set(catId, { itemId, itemLabel, catNombre });
-      state.preselect.set(pid, selMap);
+      // Recalcular precio y habilitar botón en la tarjeta correspondiente
+      const card = btn.closest('.product-card');
+      const p = (state.productos || []).find(x => x.id === pid);
+      if (card && p) renderCardPrice(card, p);
     });
   });
 
@@ -312,16 +404,19 @@ export function renderGrid(items) {
 }
 
 /* =========================================================
- * Modal "Ver" (simple, no configurable)
+ * Modal "Ver"
  * ========================================================= */
 export function openModal(p) {
   const img   = document.getElementById('modalImg');    if (img)   img.src = p.imagen || '';
   const title = document.getElementById('modalTitle');  if (title) title.textContent = p.nombre || 'Producto';
+
+  // Precio del modal: igual lógica condicional (si no completo, mostrar “Selecciona atributos”)
   const price = document.getElementById('modalPrice');
   if (price) {
-    price.textContent = Number.isFinite(Number(p.precio))
-      ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(p.precio))
-      : '';
+    const total = computeSelectedTotal(p.id, p);
+    price.textContent = (total == null)
+      ? 'Selecciona atributos'
+      : fmtCOP(total);
   }
 
   const rating = document.getElementById('modalRating');
@@ -375,7 +470,7 @@ export function wireFiltersAndControls() {
   $('#btnApply')?.addEventListener('click', () => {
     state.filtro.minPrice  = parseFloat($('#minPrice')?.value) || null;
     state.filtro.maxPrice  = parseFloat($('#maxPrice')?.value) || null;
-    state.filtro.inStock   = !!$('#inStock')?.checked;
+    state.filtro.inStock   = !!($('#inStock')?.checked);
     state.filtro.minRating = parseInt($('#minRating')?.value, 10) || 0;
     state.pag.page = 1;
     applyFilters();
@@ -416,7 +511,7 @@ export function wireFiltersAndControls() {
     state.filtro.q         = $('#qMobile')?.value.trim() || '';
     state.filtro.minPrice  = parseFloat($('#minPriceMobile')?.value) || null;
     state.filtro.maxPrice  = parseFloat($('#maxPriceMobile')?.value) || null;
-    state.filtro.inStock   = !!$('#inStockMobile')?.checked;
+    state.filtro.inStock   = !!($('#inStockMobile')?.checked);
     state.filtro.minRating = parseInt($('#minRatingMobile')?.value, 10) || 0;
     state.pag.page = 1;
     applyFilters();
@@ -466,12 +561,18 @@ export async function refreshMarketplaceFromProductos() {
   await preloadCategoriasTree();
   await loadFiltroCategorias();
 
+  // items seleccionados a nivel de filtro (si tu UI los maneja así)
+  const selectedItems = Array.isArray(state.filtro?.selectedItemIds)
+    ? state.filtro.selectedItemIds.map(Number).filter(Number.isFinite)
+    : [];
+
   // loadProductosActivos devuelve { items, total, ... } del endpoint /marketplace
   const res = await loadProductosActivos({
     q: state.filtro.q || '',
     categoriaId: state.filtro.filtroCategoriaId ?? null,
     page: 1,
     size: 200,
+    ...(selectedItems.length ? { items: selectedItems } : {})
   });
 
   // Normaliza a state.productos para que toda la UI siga funcionando
