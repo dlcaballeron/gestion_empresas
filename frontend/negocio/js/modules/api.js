@@ -161,9 +161,8 @@ export async function listProductos(params = {}) {
 /**
  * Feed del marketplace (recomendado para pintar el grid).
  * Devuelve { items, total, page, size } o { items: [] } si falla.
- * (Interno; si lo necesitas fuera, expórtalo)
  */
-async function fetchMarketplaceFeed({ q = '', categoriaId = null, page = 1, size = 200, items = [] } = {}) {
+export async function fetchMarketplaceFeed({ q = '', categoriaId = null, page = 1, size = 200, items = [] } = {}) {
   const negocioId = state.negocio?.id;
   if (!negocioId) return { items: [], total: 0, page, size };
 

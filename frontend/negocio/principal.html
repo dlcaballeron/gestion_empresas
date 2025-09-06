@@ -439,6 +439,144 @@
     </div>
   </div>
 
+  <!-- ============================== -->
+  <!-- Modal: Confirmar pedido (Checkout) -->
+  <!-- ============================== -->
+  <div class="modal fade" id="checkoutModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirmar pedido</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="row g-3">
+            <!-- Col izquierda: resumen carrito -->
+            <div class="col-12 col-lg-7">
+              <h6 class="mb-2">Tu carrito</h6>
+              <div id="chkCartList" class="vstack gap-2">
+                <!-- líneas de carrito renderizadas por checkout.js -->
+              </div>
+
+              <hr class="my-3">
+
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-secondary">Subtotal</span>
+                <span id="chkSubtotalValue" class="fw-semibold">$ 0</span>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <label for="chkShippingInput" class="mb-0 text-secondary">Domicilio</label>
+                <div class="input-group" style="max-width: 180px;">
+                  <span class="input-group-text bg-white">$</span>
+                  <input id="chkShippingInput" type="text" class="form-control text-end" placeholder="0">
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                <span class="fw-bold">Total</span>
+                <span id="chkTotalValue" class="fw-bold h5 mb-0">$ 0</span>
+              </div>
+            </div>
+
+            <!-- Col derecha: datos de contacto y entrega -->
+            <div class="col-12 col-lg-5">
+              <h6 class="mb-2">Datos de contacto</h6>
+              <div class="row g-2 mb-2">
+                <div class="col-6">
+                  <label class="form-label small">Nombre</label>
+                  <input id="chkNombre" class="form-control form-control-sm" type="text">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Apellido</label>
+                  <input id="chkApellido" class="form-control form-control-sm" type="text">
+                </div>
+                <div class="col-12">
+                  <label class="form-label small">Email</label>
+                  <input id="chkEmail" class="form-control form-control-sm" type="email">
+                </div>
+                <div class="col-12">
+                  <label class="form-label small">Teléfono</label>
+                  <input id="chkTelefono" class="form-control form-control-sm" type="text">
+                </div>
+              </div>
+
+              <h6 class="mb-2 mt-2">Dirección de entrega</h6>
+              <div class="row g-2 mb-2">
+                <div class="col-12">
+                  <label class="form-label small">Dirección</label>
+                  <input id="chkDireccion" class="form-control form-control-sm" type="text" placeholder="Calle 00 #00-00">
+                </div>
+                <div class="col-12">
+                  <label class="form-label small">Complemento</label>
+                  <input id="chkComplemento" class="form-control form-control-sm" type="text" placeholder="Apto / Interior (opcional)">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Barrio</label>
+                  <input id="chkBarrio" class="form-control form-control-sm" type="text">
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Ciudad</label>
+                  <input id="chkCiudad" class="form-control form-control-sm" type="text">
+                </div>
+                <div class="col-12">
+                  <label class="form-label small">Referencia</label>
+                  <input id="chkReferencia" class="form-control form-control-sm" type="text" placeholder="Punto de referencia">
+                </div>
+              </div>
+
+              <div class="row g-2 mb-2">
+                <div class="col-6">
+                  <label class="form-label small">Tipo de entrega</label>
+                  <select id="chkDeliveryType" class="form-select form-select-sm">
+                    <option value="domicilio">Domicilio</option>
+                    <option value="recoger">Recoger en tienda</option>
+                  </select>
+                </div>
+                <div class="col-6">
+                  <label class="form-label small">Método de pago</label>
+                  <select id="chkPaymentMethod" class="form-select form-select-sm">
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">Notas para el vendedor</label>
+                <textarea id="chkNotas" class="form-control form-control-sm" rows="3" placeholder="Ej: llamar al llegar"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button id="btnCheckoutConfirm" class="btn btn-primary">Confirmar pedido</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= NUEVO: Modal Productos (admin) ======= -->
+  <!-- Si existe este modal, admin-panel.js lo usará; si no, lo creará dinámicamente. -->
+  <div class="modal fade" id="productosAdminModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-bag me-2"></i>Productos</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body p-0">
+          <!-- Punto de montaje para modules/products.js -->
+          <div id="productosAdminMount"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ======= FIN Modal Productos (admin) ======= -->
+
   <!-- Footer parcial -->
   <div id="appFooter"></div>
 

@@ -15,8 +15,7 @@ import {
   loadNegocio,
   preloadCategoriasTree,
   loadFiltroCategorias,
-  // Nota: ya no llamamos directo a loadProductosActivos para el primer render,
-  // pero lo dejamos importado por si otros módulos lo usan.
+  // Dejado disponible para otros módulos si lo necesitan
   loadProductosActivos,
 } from './modules/api.js';
 
@@ -27,7 +26,7 @@ import {
   ensureCartUI,
   loadCartFromStorage,
   updateCartBadge,
-  bindCartHeaderButton
+  bindCartHeaderButton,
 } from './modules/cart.js';
 
 // -------------------------
@@ -37,8 +36,7 @@ import {
   buildCategoryPills,
   applyFilters,
   wireFiltersAndControls,
-  // refreshMarketplaceFromGaleria   // ❌ ya no usamos la galería para pintar el grid
-  refreshMarketplaceFromProductos,   // ✅ feed de productos (con filtros/atributos) normalizado
+  refreshMarketplaceFromProductos,   // feed de productos (con filtros/atributos) normalizado
   rebuildPillsAndRefresh,
 } from './modules/marketplace.js';
 
@@ -101,7 +99,10 @@ async function bootstrap() {
     // Header (eventos)
     bindHeaderEvents();
 
-    // Checkout (no bloquear si falla)
+    // Checkout (no bloquear si falla). El módulo se encargará de:
+    // - escuchar #btnCartContinue
+    // - escuchar cart:changed
+    // - pintar el modal de checkout
     try {
       initCheckout();
     } catch (e) {
@@ -121,18 +122,30 @@ async function bootstrap() {
       console.error('[principal] paintHeader() lanzó error:', e);
     }
 
+    // Emitimos contexto para que checkout.js pueda preconfigurar (opcional)
+    try {
+      document.dispatchEvent(new CustomEvent('checkout:context', {
+        detail: { negocio: state.negocio, sesion: state.sesion }
+      }));
+    } catch (e) {
+      console.debug('[principal] checkout:context event no crítico:', e);
+    }
+
     /* =========================================================
      * 6) Panel administrador (offcanvas)
+     *    Aquí se inicializan los listeners que abren/cargan
+     *    el modal de “Productos” (admin-panel.js se encarga).
      * =======================================================*/
     await initAdminPanel(state.negocio);
 
-    // Módulo de Productos (admin → CRUD)
-    await initProductosAdmin(state.negocio, {
-      onChange: async () => {
-        // Si el admin crea/edita algo, refresca el marketplace desde productos
-        await refreshMarketplaceFromProductos();
-      }
-    });
+    // (Opcional) Pre-montaje: si el partial del modal ya está inyectado
+    // y existe #productosAdminMount, montar de una vez el módulo.
+    // Si no existe aún, no pasa nada (admin-panel hará lazy-init al abrir).
+    try {
+      await tryPreMountProductosAdminModal();
+    } catch (e) {
+      console.debug('[principal] pre-mount productos opcional falló:', e?.message || e);
+    }
 
     // Galería (subir imágenes y asignar categorías/atributos)
     // Al cerrar, refrescamos SIEMPRE desde productos
@@ -144,21 +157,14 @@ async function bootstrap() {
     });
 
     /* =========================================================
-     * 7) Datos base de categorías (por si otros módulos los requieren)
-     *    - Estas llamadas también las hace refreshMarketplaceFromProductos(),
-     *      pero se mantienen para compatibilidad y porque son idempotentes.
+     * 7) Datos base de categorías (idempotentes)
      * =======================================================*/
     await preloadCategoriasTree();  // árbol completo (atributos + filtro)
     await loadFiltroCategorias();   // lista de categorías rol='filtro' para las pills
 
     /* =========================================================
      * 8) 🔴 PRIMER RENDER DEL MARKETPLACE
-     *    Usar SIEMPRE el feed de PRODUCTOS (no la galería).
-     *    Esta función:
-     *      - precarga categorías si hace falta,
-     *      - llama /api/negocios/:id/marketplace,
-     *      - normaliza items → state.productos (con filtros + atributos),
-     *      - arma las pills y hace applyFilters().
+     *    Usa SIEMPRE el feed de PRODUCTOS (no la galería).
      * =======================================================*/
     await refreshMarketplaceFromProductos();
 
@@ -175,9 +181,7 @@ async function bootstrap() {
     initCategoriasModal();
 
     /* =========================================================
-     * 10) (Opcional) Refresco manual simple:
-     *      Si quieres conservar este flujo manual, lo dejamos como referencia.
-     *      NOTA: refreshMarketplaceFromProductos() ya hizo todo esto.
+     * 10) (Referencia) Flujo manual antiguo
      * =======================================================*/
     // await loadProductosActivos({
     //   q: state.filtro.q || '',
@@ -203,3 +207,20 @@ async function bootstrap() {
 }
 
 bootstrap();
+
+/* =========================================================
+ * Helper opcional para pre-montar productos en el modal
+ * (solo si ya existe el partial con #productosAdminMount).
+ * Evita duplicar gracias a la verificación interna de products.js.
+ * =======================================================*/
+async function tryPreMountProductosAdminModal() {
+  const mount = document.querySelector('#productosAdminMount');
+  if (!mount) return; // el admin-panel hará lazy-init cuando abras el modal
+  // Montamos con onChange para refrescar el marketplace al guardar cambios
+  await initProductosAdmin(state.negocio, {
+    mountSelector: '#productosAdminMount',
+    onChange: async () => {
+      await refreshMarketplaceFromProductos();
+    },
+  });
+}

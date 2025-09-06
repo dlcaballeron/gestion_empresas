@@ -375,3 +375,120 @@ h6 {
 
 /* Espaciado mínimo entre badges informativos en las cards */
 #grid .badge { margin-right: .25rem; margin-bottom: .25rem; }
+
+/* =========================================================
+   NUEVO: utilidades y estilos del modal de Productos (admin)
+   ========================================================= */
+
+/* Helper usado en el sidebar de filtros */
+.sticky-top-2 {
+  position: sticky;
+  top: 1rem;          /* un poco debajo del top para respirar */
+  z-index: 1020;      /* por encima de contenido normal */
+}
+
+/* Modal de Productos: tamaño y scroll interno */
+#productosAdminModal .modal-dialog {
+  max-width: 1080px; /* sobreescribe si el modal no usa .modal-xl */
+}
+
+#productosAdminModal .modal-body {
+  max-height: calc(100vh - 180px); /* visible sin tapar el header/footer del modal */
+  overflow: auto;
+  padding: 0; /* el contenido ya maneja su propio padding */
+}
+
+/* Tabla dentro del admin de productos: header fijo */
+#productosAdminMount .table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8f9fa;
+}
+
+/* Mejor alineación vertical */
+#productosAdminMount .table td,
+#productosAdminMount .table th {
+  vertical-align: middle;
+}
+
+/* Buscador del listado */
+#adminProductos #prdSearch {
+  min-width: 200px;
+}
+
+/* Imagen picker del admin de productos */
+#imagenPickerModal .img-pick {
+  border: 1px solid #e5e7eb;
+  border-radius: .75rem;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  cursor: pointer;
+  overflow: hidden;
+  background: #fff;
+}
+
+#imagenPickerModal .img-pick:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0,0,0,.08);
+  border-color: #d1d5db;
+}
+
+#imagenPickerModal .card-img-top {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+/* Galería en modal (versión modal) */
+#gridGaleriaModal .card {
+  border-radius: .75rem;
+  overflow: hidden;
+  transition: transform .15s ease, box-shadow .15s ease;
+  border: 1px solid #eef0f2;
+}
+#gridGaleriaModal .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0,0,0,.06);
+}
+#gridGaleriaModal .card img {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+/* Ajustes sutiles a botones pequeños en modales/admin */
+.modal .btn-sm,
+#adminPanel .btn-sm {
+  border-radius: .5rem;
+}
+
+/* Quick actions (si se usa en admin-panel) */
+#adminQuickActions .btn {
+  border-radius: .5rem;
+}
+
+/* Evitar que imágenes en tablas desborden */
+#productosAdminMount img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Pequeño ajuste visual para badges del estado */
+#productosAdminMount .badge.text-bg-success,
+#productosAdminMount .badge.text-bg-secondary {
+  font-weight: 600;
+}
+
+/* Mejora de focus en elementos clicables dentro de tablas */
+#productosAdminMount .btn:focus {
+  box-shadow: 0 0 0 .15rem rgba(13,110,253,.15);
+}
+
+/* En pantallas chicas, que el modal use casi todo el alto */
+@media (max-width: 576px) {
+  #productosAdminModal .modal-body {
+    max-height: calc(100vh - 140px);
+  }
+}

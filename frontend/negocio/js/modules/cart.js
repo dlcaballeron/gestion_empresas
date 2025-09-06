@@ -1,5 +1,6 @@
 // frontend/negocio/js/modules/cart.js
 // Lateral de carrito con precio unitario y subtotal por ítem.
+// Expone utilidades para que el checkout pueda pintar y recalcular totales.
 
 import { state } from './state.js';
 import { $, warnToast, getAttrCats } from './utils.js';
@@ -7,9 +8,19 @@ import { computeUnitPrice, fmtCOP } from './attr-prices.js';
 
 function storageKey() { return `cart:${state.slug || 'negocio'}`; }
 
-/* =========================================================
- * Estado / Storage
- * ========================================================= */
+// ===== Eventos públicos (para checkout.js) ==============================
+export const CART_EVENT_CHANGED = 'cart:changed';
+function notifyCartChange() {
+  // Detalle útil para checkout (no mutar desde afuera)
+  const detail = {
+    items: structuredClone(state.cart || []),
+    qty: cartTotalQty(),
+    subtotal: cartTotalMoney(),
+  };
+  document.dispatchEvent(new CustomEvent(CART_EVENT_CHANGED, { detail }));
+}
+
+// ===== Estado / Storage ==================================================
 export function loadCartFromStorage() {
   try {
     state.cart = JSON.parse(localStorage.getItem(storageKey())) || [];
@@ -24,10 +35,12 @@ export function loadCartFromStorage() {
   }
   renderCartOffcanvas();
   updateCartBadge();
+  notifyCartChange();
 }
 
 function saveCartToStorage() {
   localStorage.setItem(storageKey(), JSON.stringify(state.cart));
+  notifyCartChange();
 }
 
 export function clearCart() {
@@ -37,15 +50,29 @@ export function clearCart() {
   updateCartBadge();
 }
 
-/* =========================================================
- * Cálculos / UI
- * ========================================================= */
-function cartTotalQty() {
+// ===== Cálculos / API reutilizable ======================================
+export function cartTotalQty() {
   return (state.cart || []).reduce((acc, it) => acc + Number(it.qty || 0), 0);
 }
 
-function cartTotalMoney() {
+export function cartTotalMoney() {
   return (state.cart || []).reduce((acc, it) => acc + Number(it.subtotal || 0), 0);
+}
+
+/**
+ * Resumen numérico para el checkout.
+ * { qty, subtotal }
+ */
+export function getCartTotals() {
+  return { qty: cartTotalQty(), subtotal: cartTotalMoney() };
+}
+
+/**
+ * Carrito “raw” para pintar líneas en el modal de checkout.
+ * ¡No modificar directamente los objetos retornados!
+ */
+export function getRawCart() {
+  return structuredClone(state.cart || []);
 }
 
 export function updateCartBadge() {
@@ -56,9 +83,7 @@ export function updateCartBadge() {
   else { badge.textContent = '0'; badge.classList.add('d-none'); }
 }
 
-/* =========================================================
- * Offcanvas + Modal "Añadir"
- * ========================================================= */
+// ===== Offcanvas + Modal "Añadir" =======================================
 export function ensureCartUI() {
   // Offcanvas
   if (!$('#cartOffcanvas')) {
@@ -223,9 +248,7 @@ export function renderCartOffcanvas() {
   if (tv) tv.textContent = fmtCOP(cartTotalMoney());
 }
 
-/* =========================================================
- * Modal "Añadir" (atributos + cantidad)
- * ========================================================= */
+// ===== Modal "Añadir" (atributos + cantidad) ============================
 export function openAddToCartModal(p, preSelMap = new Map()) {
   const title      = $('#addToCartModal .modal-title');
   const host       = $('#addAttrHost');
@@ -339,9 +362,7 @@ export function openAddToCartModal(p, preSelMap = new Map()) {
   new window.bootstrap.Modal($('#addToCartModal')).show();
 };
 
-/* =========================================================
- * API pública del carrito
- * ========================================================= */
+// ===== API pública del carrito ==========================================
 export function addToCart(row) {
   // Único por combinación de producto + atributos seleccionados
   const keyOf = (r) => `${r.pid}|` + (r.selections || [])
@@ -388,3 +409,9 @@ export function getCartForCheckout() {
     img_url: r.imagen || null
   }));
 }
+
+// ===== Integración con checkout: limpiar al crear pedido ================
+// Cuando el checkout confirma y emite 'pedido:creado', vaciamos el carrito.
+document.addEventListener('pedido:creado', () => {
+  clearCart();
+});

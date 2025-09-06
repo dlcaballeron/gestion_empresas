@@ -1,0 +1,109 @@
+/* frontend/negocio/js/modules/productos-modal.css
+   Estilos específicos del modal de Productos (admin) y su picker de imágenes.
+   Úsalo si prefieres no mezclar estos estilos en principal-style.css. */
+
+/* ===============================
+   Modal: layout, tabs y scroll
+   =============================== */
+#productosAdminModal .modal-dialog {
+  max-width: 1080px; /* tamaño amplio para tabla y formularios */
+}
+
+#productosAdminModal .modal-body {
+  max-height: calc(100vh - 180px); /* evita que el modal crezca más del viewport */
+  overflow: auto;
+  padding: 0; /* el contenido interno maneja su propio padding */
+}
+
+/* Tabs pegajosas dentro del modal (si hay mucho contenido) */
+#productosAdminModal .nav-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* ===============================
+   Listado de productos (tabla)
+   =============================== */
+#productosAdminMount .table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8f9fa;
+}
+
+#productosAdminMount .table td,
+#productosAdminMount .table th {
+  vertical-align: middle;
+}
+
+#adminProductos #prdSearch {
+  min-width: 200px;
+}
+
+/* Previsualización de imagen en el formulario */
+#productoForm #prdImgPreview {
+  border-radius: .5rem;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+/* Estados como badge */
+#productosAdminMount .badge.text-bg-success,
+#productosAdminMount .badge.text-bg-secondary {
+  font-weight: 600;
+}
+
+/* Botones en celdas: focus accesible */
+#productosAdminMount .btn:focus {
+  box-shadow: 0 0 0 .15rem rgba(13,110,253,.15);
+}
+
+/* Evitar que imágenes en tablas desborden */
+#productosAdminMount img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* ===============================
+   Picker de imágenes (products.js)
+   =============================== */
+#imagenPickerModal .img-pick {
+  border: 1px solid #e5e7eb;
+  border-radius: .75rem;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  cursor: pointer;
+  overflow: hidden;
+  background: #fff;
+}
+
+#imagenPickerModal .img-pick:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(0,0,0,.08);
+  border-color: #d1d5db;
+}
+
+#imagenPickerModal .card-img-top {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+}
+
+/* ===============================
+   Ajustes generales en modales
+   =============================== */
+#productosAdminModal .btn-sm,
+#imagenPickerModal .btn-sm {
+  border-radius: .5rem;
+}
+
+/* En pantallas chicas, permitir un poco más de alto útil */
+@media (max-width: 576px) {
+  #productosAdminModal .modal-body {
+    max-height: calc(100vh - 140px);
+  }
+}

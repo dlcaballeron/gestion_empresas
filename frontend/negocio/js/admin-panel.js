@@ -1,18 +1,18 @@
 // frontend/negocio/js/admin-panel.js
 
-// ===== Imports para el módulo de productos =====
+// ===== Imports =====
 import { initProductosAdmin } from './modules/products.js';
 import { state } from './modules/state.js';
 import { openAttrPricesModal } from './modules/attr-prices.js';
 
-// Estado global del módulo (solo para este archivo)
+// ===== Estado local =====
 let NEGOCIO_ID = null;
 
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 
 /**
- * Inicializa el panel del administrador dentro del offcanvas.
+ * Inicializa el panel del administrador (offcanvas).
  * Se llama desde principal.js con el objeto "negocio" ya cargado.
  */
 export async function initAdminPanel(negocio) {
@@ -23,7 +23,7 @@ export async function initAdminPanel(negocio) {
   const info = $('#adminNegocioInfo');
   if (info) info.textContent = `${negocio.razon_social || 'Negocio'} · ID ${NEGOCIO_ID}`;
 
-  // ——— Acciones rápidas (inyecta el botón de "Precios de atributos") ———
+  // ——— Acciones rápidas ———
   ensureTopActions();
 
   // ——— Previews iniciales de logo y portada ———
@@ -201,59 +201,121 @@ export async function initAdminPanel(negocio) {
   wireGaleria();
   await listarGaleria();
 
-  /* ============== MÓDULO: PRODUCTOS ==================== */
-  // Botones del menú lateral (si existen en tu HTML)
+  /* ============== BOTONES DEL MENÚ LATERAL ============== */
   const btnGaleria    = $('#btnModGaleria');
   const btnCategorias = $('#btnModCategorias');
-  const btnProductos  = $('#btnModProductos');
+  const btnProductos  = $('#btnModProductos'); // abrirá el modal
 
-  // Secciones (si existen). La de productos la creamos si falta.
+  // Secciones visibles dentro del offcanvas (galería / categorías)
   const secGaleria    = $('#modGaleriaSection');
   const secCategorias = $('#modCategoriasSection');
-  let   secProductos  = $('#modProductosSection');  // contenedor para montar products.js
 
-  function ensureProductosSection() {
-    const body = $('#adminPanel .offcanvas-body') || document.body;
-    secProductos = $('#modProductosSection');
-    if (!secProductos) {
-      secProductos = document.createElement('section');
-      secProductos.id = 'modProductosSection';
-      // punto de montaje, products.js creará #adminProductos dentro
-      const wrap = document.createElement('div');
-      wrap.id = 'modProductosMount';
-      secProductos.appendChild(wrap);
-      body.appendChild(secProductos);
-    }
-    return secProductos;
-  }
-
-  function showModule(which) {
-    const all = [secGaleria, secCategorias, secProductos].filter(Boolean);
-    all.forEach(el => el.style.display = 'none');
+  function showSection(which) {
+    const all = [secGaleria, secCategorias].filter(Boolean);
+    all.forEach(el => (el.style.display = 'none'));
 
     if (which === 'galeria' && secGaleria)      secGaleria.style.display = 'block';
     if (which === 'categorias' && secCategorias) secCategorias.style.display = 'block';
-    if (which === 'productos') {
-      ensureProductosSection().style.display = 'block';
-      // inicialización perezosa
-      initProductosOnDemand(negocio).catch(()=>{});
-    }
 
-    // activar visualmente los botones (si existen)
+    // Activar botones visualmente
     $$('.admin-mod-btn').forEach(b => b.classList.remove('active'));
     if (which === 'galeria'    && btnGaleria)    btnGaleria.classList.add('active');
     if (which === 'categorias' && btnCategorias) btnCategorias.classList.add('active');
-    if (which === 'productos'  && btnProductos)  btnProductos.classList.add('active');
   }
 
-  // Listeners del menú lateral (opcionales)
-  if (btnGaleria)    btnGaleria.addEventListener('click', () => showModule('galeria'));
-  if (btnCategorias) btnCategorias.addEventListener('click', () => showModule('categorias'));
-  if (btnProductos)  btnProductos.addEventListener('click', () => showModule('productos'));
+  // Listeners del menú lateral
+  if (btnGaleria)    btnGaleria.addEventListener('click', () => showSection('galeria'));
+  if (btnCategorias) btnCategorias.addEventListener('click', () => showSection('categorias'));
+  if (btnProductos)  btnProductos.addEventListener('click', () => showProductosModal(negocio));
 
   // Si tu HTML marca un módulo por defecto, respétalo; si no, deja visible lo que ya estaba.
-  // Puedes forzar a abrir "Productos" descomentando:
-  // showModule('productos');
+  // Puedes forzar por defecto:
+  // showSection('galeria');
+}
+
+/* ------------------------- Modal de PRODUCTOS ------------------------- */
+
+/**
+ * Crea (si hace falta) y retorna el modal de Productos.
+ * Monta dentro un contenedor #productosAdminMount para products.js
+ */
+function ensureProductosModal() {
+  let modal = $('#productosAdminModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'productosAdminModal';
+    modal.className = 'modal fade';
+    modal.tabIndex = -1;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-bag me-2"></i>Productos</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-0">
+            <div id="productosAdminMount"></div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  // Preferir Bootstrap si está disponible; si no, proveer un fallback simple
+  let bsModal = null;
+  try { bsModal = window.bootstrap ? new window.bootstrap.Modal(modal, { backdrop: 'static' }) : null; }
+  catch { bsModal = null; }
+
+  return { modal, bsModal };
+}
+
+/**
+ * Abre el modal y realiza la inicialización perezosa del módulo de productos.
+ */
+async function showProductosModal(negocio) {
+  const { modal, bsModal } = ensureProductosModal();
+
+  // Inicialización perezosa SOLO una vez
+  if (!modal.dataset._init) {
+    await ensureCategoriasTree(); // requiere state.categoriasTree
+    const mount = $('#productosAdminMount', modal);
+    if (mount && !$('#adminProductos', mount)) {
+      await initProductosAdmin(negocio, { mountSelector: '#productosAdminMount' });
+    }
+    modal.dataset._init = '1';
+  }
+
+  if (bsModal) {
+    bsModal.show();
+  } else {
+    // Fallback si no está Bootstrap JS
+    modal.classList.add('show', 'd-block');
+    modal.removeAttribute('aria-hidden');
+    // Cerrar con botón (data-bs-dismiss) en fallback
+    const closeBtn = modal.querySelector('[data-bs-dismiss="modal"]');
+    if (closeBtn && !closeBtn._fallbackBound) {
+      closeBtn._fallbackBound = true;
+      closeBtn.addEventListener('click', () => {
+        modal.classList.remove('show', 'd-block');
+        modal.setAttribute('aria-hidden', 'true');
+      });
+    }
+  }
+}
+
+/* -------------- Carga de categorías para products.js -------------- */
+
+async function ensureCategoriasTree() {
+  if (Array.isArray(state.categoriasTree) && state.categoriasTree.length) return;
+  try {
+    const r = await fetch(`/api/negocios/${NEGOCIO_ID}/categorias/tree`);
+    const j = r.ok ? await r.json() : [];
+    if (Array.isArray(j)) state.categoriasTree = j;
+  } catch {
+    state.categoriasTree = Array.isArray(state.categoriasTree) ? state.categoriasTree : [];
+  }
 }
 
 /* ----------------- GALERÍA: UI y llamadas ----------------- */
@@ -383,37 +445,6 @@ async function listarGaleria() {
   }
 }
 
-/* -------------- Inicialización perezosa de Productos -------------- */
-
-async function initProductosOnDemand(negocio) {
-  // Asegurar árbol de categorías en state (rol=atributo y filtros; el editor usa atributos)
-  await ensureCategoriasTree();
-
-  // Punto de montaje para products.js
-  const mount = $('#modProductosMount') || $('#modProductosSection') || $('#adminPanel .offcanvas-body') || document.body;
-
-  // Evitar doble render si ya existe la sección pintada
-  if ($('#adminProductos', mount)) return;
-
-  // init del módulo
-  await initProductosAdmin(negocio, {
-    mountSelector: '#modProductosSection' // dentro de este section products.js creará su contenido
-  });
-}
-
-async function ensureCategoriasTree() {
-  if (Array.isArray(state.categoriasTree) && state.categoriasTree.length) return;
-  try {
-    // Endpoint sugerido; ajusta si tu backend expone otro
-    const r = await fetch(`/api/negocios/${NEGOCIO_ID}/categorias/tree`);
-    const j = r.ok ? await r.json() : [];
-    if (Array.isArray(j)) state.categoriasTree = j;
-  } catch {
-    // deja state.categoriasTree como [] si falla
-    state.categoriasTree = Array.isArray(state.categoriasTree) ? state.categoriasTree : [];
-  }
-}
-
 /* ------------------------- Quick actions ------------------------- */
 function ensureTopActions() {
   const body = $('#adminPanel .offcanvas-body');
@@ -424,7 +455,6 @@ function ensureTopActions() {
     wrap = document.createElement('div');
     wrap.id = 'adminQuickActions';
     wrap.className = 'mb-3';
-    // lo insertamos al inicio del panel
     body.insertBefore(wrap, body.firstChild);
   }
 
@@ -437,6 +467,17 @@ function ensureTopActions() {
     btn.innerHTML = `<i class="bi bi-cash-coin me-1"></i> Precios de atributos`;
     wrap.appendChild(btn);
     btn.addEventListener('click', () => openAttrPricesModal({ negocioId: NEGOCIO_ID }));
+  }
+
+  // (Opcional) Acceso rápido a Productos desde el panel
+  if (!$('#btnQuickProductos', wrap)) {
+    const btnP = document.createElement('button');
+    btnP.id = 'btnQuickProductos';
+    btnP.type = 'button';
+    btnP.className = 'btn btn-sm btn-outline-primary w-100 text-start mt-2';
+    btnP.innerHTML = `<i class="bi bi-bag me-1"></i> Gestionar productos`;
+    wrap.appendChild(btnP);
+    btnP.addEventListener('click', () => showProductosModal({ id: NEGOCIO_ID, ...state.negocio, ...{} }));
   }
 }
 
