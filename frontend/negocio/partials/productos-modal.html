@@ -1,0 +1,131 @@
+<!-- frontend/partials/productos-modal.html -->
+<div class="modal fade" id="productosAdminModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <!-- Header -->
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-bag h5 mb-0"></i>
+          <h5 class="modal-title">Productos</h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <!-- Tabs -->
+      <div class="modal-body p-0">
+        <ul class="nav nav-tabs px-3 pt-2" id="productosTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link active"
+              id="tab-listar"
+              data-bs-toggle="tab"
+              data-bs-target="#tabPaneListar"
+              type="button"
+              role="tab"
+              aria-controls="tabPaneListar"
+              aria-selected="true">
+              Listar / Consultar
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link"
+              id="tab-crear"
+              data-bs-toggle="tab"
+              data-bs-target="#tabPaneCrear"
+              type="button"
+              role="tab"
+              aria-controls="tabPaneCrear"
+              aria-selected="false">
+              Crear nuevo
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <!-- TAB: LISTAR -->
+          <div class="tab-pane fade show active" id="tabPaneListar" role="tabpanel" aria-labelledby="tab-listar" tabindex="0">
+            <!-- Punto de montaje para modules/products.js -->
+            <div id="productosAdminMount" class="p-3">
+              <!-- products.js inyecta aquí su UI (buscador, tabla y botón "Nuevo") -->
+              <div class="text-secondary small">Cargando módulo de productos…</div>
+            </div>
+          </div>
+
+          <!-- TAB: CREAR NUEVO -->
+          <div class="tab-pane fade" id="tabPaneCrear" role="tabpanel" aria-labelledby="tab-crear" tabindex="0">
+            <div class="p-3">
+              <div class="alert alert-light border d-flex align-items-start gap-2">
+                <i class="bi bi-info-circle text-primary mt-1"></i>
+                <div>
+                  El formulario de creación/edición se abre como un modal independiente.
+                  Puedes abrirlo desde aquí o desde el botón <b>“Nuevo”</b> en la pestaña <em>Listar / Consultar</em>.
+                </div>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2">
+                <button id="btnOpenNuevoProducto" type="button" class="btn btn-success">
+                  <i class="bi bi-plus-lg me-1"></i> Crear producto
+                </button>
+                <button id="btnIrAListar" type="button" class="btn btn-outline-secondary">
+                  <i class="bi bi-card-list me-1"></i> Ir a Listar
+                </button>
+              </div>
+
+              <hr class="my-3">
+
+              <p class="text-secondary small mb-0">
+                Tip: si no ves el formulario, asegúrate de que el módulo de productos esté montado en la pestaña
+                <em>Listar / Consultar</em>. Este parcial solo provee el contenedor y las pestañas;
+                el contenido lo renderiza <code>modules/products.js</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Script auxiliar mínimo para accionar "Crear" desde esta pestaña -->
+<script>
+  (function () {
+    // Abre el formulario "Nuevo" del módulo products.js simulando click en su botón
+    function tryOpenNuevoProducto() {
+      // El botón real lo crea products.js dentro de #productosAdminMount
+      const btnNuevo = document.querySelector('#productosAdminMount #btnAddProducto');
+      if (btnNuevo) {
+        btnNuevo.click();
+        // Volvemos a la pestaña de Listar para mantener coherencia visual (opcional)
+        const tabTrigger = document.querySelector('#tab-listar');
+        if (tabTrigger) tabTrigger.click();
+      } else {
+        // Si aún no montó, cambiamos a listar para que se monte y el usuario lo use ahí
+        const tabTrigger = document.querySelector('#tab-listar');
+        if (tabTrigger) tabTrigger.click();
+        // Pequeño aviso no obstructivo
+        console.debug('[productos-modal] El módulo aún no montó; usa el botón "Nuevo" en la pestaña Listar.');
+      }
+    }
+
+    // Enlazar botones si existen
+    document.addEventListener('click', function (ev) {
+      const target = ev.target.closest('#btnOpenNuevoProducto, #btnIrAListar');
+      if (!target) return;
+
+      if (target.id === 'btnOpenNuevoProducto') {
+        ev.preventDefault();
+        tryOpenNuevoProducto();
+      } else if (target.id === 'btnIrAListar') {
+        ev.preventDefault();
+        const tabTrigger = document.querySelector('#tab-listar');
+        if (tabTrigger) tabTrigger.click();
+      }
+    }, { passive: false });
+  })();
+</script>
